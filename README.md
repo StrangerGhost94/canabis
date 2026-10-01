@@ -21,6 +21,15 @@ Demo accounts (password `cairn-demo-2026`): `customer@`, `morgan@`, `retailer@`,
 
 Production: `npm run build && npm start`. Set `DEMO_MODE=false`, a strong `SESSION_SECRET`, `HASH_SALT`, `CRON_SECRET`, and schedule `POST /api/cron/licences` daily with header `x-cron-secret`.
 
+## Deploy on Railway
+1. Push this repo to GitHub and create a Railway project from it.
+2. Add a **PostgreSQL** service; Railway exposes `DATABASE_URL` — reference it in the app service's variables.
+3. Set variables on the app service: `SESSION_SECRET` (openssl rand -base64 48), `HASH_SALT` (openssl rand -base64 24), `APP_URL` (your Railway URL), `DEMO_MODE` (`true` for the demo, `false` for real use), `CRON_SECRET`, and `UPLOAD_DIR=/data/uploads`.
+4. Attach a **volume** mounted at `/data` so licence documents and product images survive redeploys.
+5. Deploy. Migrations run automatically on start (`npm start`); `/api/health` is the health check.
+6. Load data once from the service shell: `npm run db:seed` (with `DEMO_MODE=true` for demo data).
+7. Schedule a daily `POST https://<app>/api/cron/licences` with header `x-cron-secret: $CRON_SECRET` (Railway cron service or any scheduler).
+
 ## What's in it
 **Customers** — province/age gate, storefront home with format shelves, shop grid with filters (format, THC:CBD balance, price where permitted, in stock, open now, distance), store pages with per-location stock, product pages, one-store cart (guest carts carry over on sign-in), live 30 g possession-limit meter, checkout for pickup or delivery with ID confirmation, order tracking with progress and notifications, saved items, settings.
 
