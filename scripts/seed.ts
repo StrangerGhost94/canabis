@@ -73,16 +73,18 @@ async function main() {
       .onConflictDoNothing();
   }
 
+  if (!DEMO) {
+    await purgeDemo();
+    await bootstrapAdmin();
+    console.log("Done.");
+    return pool.end();
+  }
+
   const pw = await hash(PASSWORD, { memoryCost: 19456, timeCost: 2, parallelism: 1 });
   const [admin] = await db.insert(s.users).values({
     email: "admin@cairn.demo", name: "Platform Admin", passwordHash: pw, birthDate: "1985-04-02",
-    jurisdictionCode: "ON", roles: ["CUSTOMER", "ADMIN"], isDemo: DEMO,
+    jurisdictionCode: "ON", roles: ["CUSTOMER", "ADMIN"], isDemo: true,
   }).onConflictDoNothing().returning();
-
-  if (!DEMO) {
-    console.log("Done. Admin: admin@cairn.demo");
-    return pool.end();
-  }
   if (!admin) {
     console.log("Demo data already present — run `npm run db:reset` to start over.");
     return pool.end();
@@ -244,7 +246,7 @@ async function main() {
     // Each store carries a different slice of the catalogue, from rotating brands.
     const picks = CATALOGUE.filter((_, i) => (i + si) % 3 !== 0 || i < 3);
     for (const [i, p] of picks.entries()) {
-      const brand = BRANDS[(i + si * 3) % BRANDS.length];
+      const brand = BRANDS[CATALOGUE.indexOf(p) % BRANDS.length];
       const drift = ((si * 7 + i * 3) % 5) * 50;
       const [prod] = await db.insert(s.products).values({
         retailerId: r.id, name: p.name, brand, category: p.category, size: p.size, potencyUnit: p.unit,
@@ -355,6 +357,51 @@ async function main() {
   admin@cairn.demo · retailer@cairn.demo · partner@cairn.demo · partner.bc@cairn.demo
   applicant@cairn.demo · newstore@cairn.demo · customer@cairn.demo`);
   await pool.end();
+}
+
+/**
+ * Real mode: remove every fictional row and every simulated rule determination.
+ * Idempotent, so it is safe to run on every deploy.
+ */
+async function purgeDemo() {
+  const demoRetailers = sql`(select id from retailers where is_demo)`;
+  const demoPartners = sql`(select id from partners where is_demo)`;
+  const demoUsers = sql`(select id from users where is_demo)`;
+  const r = await db.transaction(async (tx) => {
+    await tx.execute(sql`delete from conversions where is_demo or retailer_id in ${demoRetailers} or partner_id in ${demoPartners}`);
+    await tx.execute(sql`delete from referral_events where is_demo or retailer_id in ${demoRetailers} or partner_id in ${demoPartners}`);
+    await tx.execute(sql`delete from orders where is_demo or user_id in ${demoUsers} or retailer_id in ${demoRetailers}`);
+    await tx.execute(sql`delete from carts where user_id in ${demoUsers} or retailer_id in ${demoRetailers}`);
+    await tx.execute(sql`delete from risk_flags where subject_id in ${demoPartners} or subject_id in ${demoRetailers}`);
+    const rs = await tx.execute(sql`delete from retailers where is_demo`);
+    await tx.execute(sql`delete from partners where is_demo`);
+    const us = await tx.execute(sql`delete from users where is_demo`);
+    const rules = await tx.execute(sql`update jurisdiction_rules set status = 'UNCONFIRMED', source = null, notes = null, is_demo = false, reviewed_by_id = null, reviewed_at = null where is_demo`);
+    return { stores: rs.rowCount ?? 0, users: us.rowCount ?? 0, rules: rules.rowCount ?? 0 };
+  });
+  if (r.stores || r.users || r.rules) console.log(`Removed demo data: ${r.stores} stores, ${r.users} accounts, ${r.rules} simulated rule settings reset.`);
+}
+
+/** Creates (or promotes) the first administrator from ADMIN_EMAIL / ADMIN_PASSWORD. Never uses a default password. */
+async function bootstrapAdmin() {
+  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.ADMIN_PASSWORD;
+  if (!email) return console.log("No ADMIN_EMAIL set; skipping admin bootstrap.");
+  const existing = await db.query.users.findFirst({ where: (u, { eq }) => eq(u.email, email) });
+  if (existing) {
+    if (!existing.roles.includes("ADMIN")) {
+      await db.update(s.users).set({ roles: [...existing.roles, "ADMIN"] }).where(sql`${s.users.id} = ${existing.id}`);
+      console.log(`Granted admin to ${email}.`);
+    }
+    return;
+  }
+  if (!password || password.length < 12) return console.log(`No account for ${email} yet. Sign up with that email to become the administrator.`);
+  await db.insert(s.users).values({
+    email, name: process.env.ADMIN_NAME?.trim() || "Administrator",
+    passwordHash: await hash(password, { memoryCost: 19456, timeCost: 2, parallelism: 1 }),
+    birthDate: "1970-01-01", jurisdictionCode: process.env.ADMIN_REGION?.trim().toUpperCase() || "ON", roles: ["CUSTOMER", "ADMIN"],
+  });
+  console.log(`Created administrator ${email}.`);
 }
 
 main().catch(async (e) => {

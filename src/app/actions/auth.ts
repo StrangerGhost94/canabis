@@ -70,14 +70,17 @@ export async function signUp(_: ActionState, form: FormData): Promise<ActionStat
     const exists = await db.query.users.findFirst({ where: eq(schema.users.email, d.email), columns: { id: true } });
     if (exists) throw new z.ZodError([{ code: "custom", path: ["email"], message: "An account with this email already exists. Sign in instead." }]);
 
-    const roles: ("CUSTOMER" | "RETAILER" | "PARTNER")[] = ["CUSTOMER"];
+    const roles: ("CUSTOMER" | "RETAILER" | "PARTNER" | "ADMIN")[] = ["CUSTOMER"];
     if (d.intent !== "CUSTOMER") roles.push(d.intent);
+    // The platform owner becomes admin by signing up with the address in ADMIN_EMAIL,
+    // so no admin password ever has to live in deployment settings.
+    if (process.env.ADMIN_EMAIL && process.env.ADMIN_EMAIL.trim().toLowerCase() === d.email) roles.push("ADMIN");
     const [user] = await db.insert(schema.users).values({
       name: d.name, email: d.email, passwordHash: await hashPassword(d.password), birthDate: d.birthDate,
       jurisdictionCode: d.region, roles,
     }).returning({ id: schema.users.id });
     await createSession(user.id);
-    await audit({ actorId: user.id, action: "auth.sign_up", targetType: "user", targetId: user.id, metadata: { intent: d.intent } });
+    await audit({ actorId: user.id, action: "auth.sign_up", targetType: "user", targetId: user.id, metadata: { intent: d.intent, admin: roles.includes("ADMIN") } });
     dest = d.intent === "RETAILER" ? "/retailer/onboarding" : d.intent === "PARTNER" ? "/partners/apply" : safeNext(form.get("next"));
   } catch (e) {
     return fail(e, form);

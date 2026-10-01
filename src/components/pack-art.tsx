@@ -4,7 +4,7 @@
  * imagery, and works for any product a store adds. Stores can upload a real
  * pack shot to replace it.
  */
-const BRAND_INKS = ["#1f2148", "#1c7a4f", "#b8461b", "#2a53c4", "#6d2a63", "#0f6e6a", "#8a5a00", "#3d3f73"];
+const BRAND_INKS = ["#1a1620", "#2f5a46", "#7a3b24", "#33427a", "#5e1f3d", "#245a5a", "#7d6232", "#47404f"];
 
 export function brandInk(brand: string) {
   let h = 0;
@@ -22,12 +22,12 @@ export function PackArt({ p, size = 200 }: { p: { category: string; brand: strin
     <g>
       <rect x={x} y={y} width={w} height={h} rx={4} fill="#fff" />
       <rect x={x} y={y} width={w} height={small ? 4 : 6} fill={ink} />
-      <text x={x + w / 2} y={y + h / 2 + (small ? 4 : 6)} textAnchor="middle" fontSize={small ? 8.5 : 11} fontWeight={700} fill={ink} fontFamily="var(--font)" style={{ fontStretch: "80%" }}>
+      <text x={x + w / 2} y={y + h / 2 + (small ? 4 : 6)} textAnchor="middle" fontSize={small ? 9 : 12} fontWeight={600} fill={ink} fontFamily="var(--font-display)" fontStyle="italic">
         {p.brand.length > 12 ? p.brand.split(" ")[0] : p.brand}
       </text>
     </g>
   );
-  const stroke = { stroke: "#1f2148", strokeWidth: 2.5, strokeLinejoin: "round" as const };
+  const stroke = { stroke: "#1a1620", strokeWidth: 2, strokeLinejoin: "round" as const };
   let art: React.ReactNode;
   switch (p.category) {
     case "FLOWER":
@@ -50,7 +50,7 @@ export function PackArt({ p, size = 200 }: { p: { category: string; brand: strin
       art = (<>
         <rect x="88" y="26" width="24" height="26" rx="6" fill={ink} {...stroke} />
         <rect x="82" y="50" width="36" height="104" rx="8" fill="#fff" {...stroke} />
-        <rect x="90" y="62" width="20" height="54" rx="4" fill="#f2b400" fillOpacity=".75" />
+        <rect x="90" y="62" width="20" height="54" rx="4" fill="#c9a35a" fillOpacity=".8" />
         <rect x="86" y="152" width="28" height="22" rx="4" fill="#9aa0b8" {...stroke} />
         {label(66, 120, 68, 26, true)}
       </>);
@@ -111,7 +111,7 @@ export function PackArt({ p, size = 200 }: { p: { category: string; brand: strin
   }
   return (
     <svg viewBox="0 0 200 200" width={size} height={size} aria-hidden style={{ width: "100%", height: "100%" }}>
-      <ellipse cx="100" cy="182" rx="62" ry="7" fill="#1f2148" opacity=".1" />
+      <ellipse cx="100" cy="182" rx="58" ry="5" fill="#1a1620" opacity=".08" />
       {art}
     </svg>
   );

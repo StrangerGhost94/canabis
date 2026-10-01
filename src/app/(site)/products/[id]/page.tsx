@@ -40,9 +40,17 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const best = locs.find((l) => l.stock !== "OUT");
   const saved = v.user ? !!(await db.query.favourites.findFirst({ where: and(eq(schema.favourites.userId, v.user.id), eq(schema.favourites.productId, p.id)) })) : false;
   const others = await db.query.products.findMany({
-    where: and(ilike(schema.products.name, p.name), ilike(schema.products.brand, p.brand), ne(schema.products.id, p.id), eq(schema.products.status, "ACTIVE"), inArray(schema.products.retailerId, listed.map((x) => x.id).concat("_"))),
-    with: { retailer: true },
+    where: and(ilike(schema.products.name, p.name), ilike(schema.products.brand, p.brand), eq(schema.products.size, p.size), ne(schema.products.id, p.id), eq(schema.products.status, "ACTIVE"), inArray(schema.products.retailerId, listed.map((x) => x.id).concat("_"))),
+    with: { retailer: true, inventory: true },
   });
+  const offers = [
+    { id: p.id, retailer: r, priceCents: p.priceCents, inStock: locs.some((l) => l.stock !== "OUT"), current: true, locationId: best?.id },
+    ...others.map((o) => {
+      const lr = listed.find((x) => x.id === o.retailerId)!;
+      const stocked = lr.locations.filter((l) => o.inventory.some((i) => i.locationId === l.id && i.status !== "OUT"));
+      return { id: o.id, retailer: lr, priceCents: o.priceCents, inStock: stocked.length > 0, current: false, locationId: stocked[0]?.id };
+    }),
+  ].sort((a, b) => Number(b.inStock) - Number(a.inStock) || a.priceCents - b.priceCents);
 
   return (
     <div className="wrap product">
@@ -52,13 +60,14 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         <div className="stack" style={{ ["--gap" as string]: "18px" }}>
           <div className="row between top" style={{ flexWrap: "nowrap" }}>
             <div>
-              <h1 className="h1">{p.name}</h1>
-              <p className="lede">{p.brand}, {p.size}</p>
+              <Link href={`/brands/${p.brand.toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/[\s_]+/g, "-")}`} className="pcard-brand">{p.brand}</Link>
+              <h1 className="h1" style={{ fontSize: "clamp(2.4rem, 4.5vw, 3.6rem)" }}>{p.name}</h1>
+              <p className="muted">{p.size}</p>
             </div>
             <SaveButton kind="product" id={p.id} saved={saved} back={`/products/${p.id}`} label={p.name} />
           </div>
           <div className="row" style={{ ["--gap" as string]: "16px", alignItems: "baseline" }}>
-            {showPrices ? <p className="h2 num">{money(p.priceCents)}</p> : <p className="muted">{policy.offMessage("retail.prices")}</p>}
+            {showPrices ? <p className="num" style={{ fontSize: "1.75rem", fontWeight: 600 }}>{money(p.priceCents)}</p> : <p className="muted">{policy.offMessage("retail.prices")}</p>}
             {best ? <span className={`status ${STOCK[best.stock][0]}`}>{STOCK[best.stock][1]}{locs.length > 1 ? ` at ${best.name}` : ""}</span> : <span className="status idle">Out of stock</span>}
           </div>
           <dl className="facts">
@@ -92,26 +101,39 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             <p className="xs muted">The store checks government ID and takes payment when you collect or receive your order.</p>
           </div>
 
-          {others.length > 0 && (
-            <div>
-              <h2 className="h4 mb-2">Also at</h2>
-              <ul className="list ruled">
-                {others.map((o) => <li key={o.id}><Link className="list-link row between" style={{ padding: "10px 4px" }} href={`/products/${o.id}`}><span>{o.retailer.tradeName}</span>{showPrices && <span className="num">{money(o.priceCents)}</span>}</Link></li>)}
+          {offers.length > 1 && (
+            <section id="offers" aria-labelledby="offers-h">
+              <h2 id="offers-h" className="h3 mb-2">{offers.length} offers from licensed stores</h2>
+              <ul className="list offers">
+                {offers.map((o) => (
+                  <li key={o.id} className={`offer ${o.current ? "is-current" : ""}`}>
+                    <div className="grow">
+                      <Link href={`/stores/${o.retailer.slug}`} className="strong" style={{ color: "var(--ink)" }}>{o.retailer.tradeName}</Link>
+                      <p className="xs muted">{o.retailer.locations.map((l) => l.name).join(", ")}{o.current ? ", this listing" : ""}</p>
+                    </div>
+                    <span className={`status ${o.inStock ? "ok" : "idle"} xs`}>{o.inStock ? "In stock" : "Out of stock"}</span>
+                    {showPrices && <span className="num strong" style={{ minWidth: 72, textAlign: "right" }}>{money(o.priceCents)}</span>}
+                    {o.current ? <span className="xs muted" style={{ width: 40 }} /> : o.inStock ? <AddToCart productId={o.id} name={`${p.name} from ${o.retailer.tradeName}`} disabled={orderBlock(policy, o.retailer)} locationId={o.locationId} /> : <span style={{ width: 40 }} />}
+                  </li>
+                ))}
               </ul>
-            </div>
+            </section>
           )}
         </div>
       </div>
       <style>{`
         .product { padding-block: var(--s5) var(--s8); }
         .product-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s7); align-items: start; }
-        .pd-shelf { position: sticky; top: 130px; aspect-ratio: 1 / 1; border-radius: 24px; padding: 12%; }
+        .pd-shelf { position: sticky; top: 150px; aspect-ratio: 4 / 5; padding: 14%; }
         .facts { display: grid; grid-template-columns: 1fr 1fr; margin: 0; background: var(--surface); border-radius: var(--r-panel); overflow: hidden; }
         .facts div { padding: 12px 16px; border-bottom: 1px solid var(--rule-soft); }
         .facts div:nth-child(odd) { border-right: 1px solid var(--rule-soft); }
         .facts div:nth-last-child(-n+2) { border-bottom: 0; }
         .facts dt { font-size: var(--t-xs); color: var(--ink-2); }
-        .facts dd { margin: 2px 0 0; font-weight: 650; font-size: var(--t-md); }
+        .facts dd { margin: 2px 0 0; font-weight: 600; font-size: var(--t-md); }
+        .offers { border-top: 1px solid var(--rule); }
+        .offer { display: flex; align-items: center; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--rule); }
+        .offer.is-current { background: linear-gradient(90deg, var(--surface), transparent); padding-left: 10px; }
         @media (max-width: 860px) { .product-grid { grid-template-columns: 1fr; gap: var(--s5); } .pd-shelf { position: static; max-width: 420px; } }
       `}</style>
     </div>

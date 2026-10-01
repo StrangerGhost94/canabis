@@ -128,6 +128,8 @@ export const retailers = pgTable("retailers", {
   about: text("about"),
   website: text("website"),
   orderingUrl: text("ordering_url"), // legacy: retailer's own ordering page (unused by the marketplace)
+  logoKey: text("logo_key"), // store logo (public media)
+  coverKey: text("cover_key"), // storefront cover photo (public media)
   acceptsOrders: boolean("accepts_orders").notNull().default(false),
   pickupLeadMinutes: integer("pickup_lead_minutes").notNull().default(30),
   deliveryFeeCents: integer("delivery_fee_cents").notNull().default(0),

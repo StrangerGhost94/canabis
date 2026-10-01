@@ -5,40 +5,35 @@ import { ProductCard } from "@/components/product-card";
 import { StoreCard } from "@/components/store-card";
 import { allowedCategories } from "@/lib/compliance";
 import { CATEGORIES, CATEGORY_LABEL } from "@/lib/format";
-import { discover, orderBlock } from "@/lib/queries";
+import { brandsFor, COLLECTIONS, discover, orderBlock, toListings } from "@/lib/queries";
 import { getVisitor } from "@/lib/visitor";
 
-const SHELF_BRANDS: Record<string, string> = { FLOWER: "Paperbirch", PRE_ROLL: "Low Tide", VAPE: "Muskeg", EDIBLE: "Fieldwork", BEVERAGE: "Shale & Co.", EXTRACT: "Granite Hollow", TOPICAL: "Northcourt", CAPSULE: "Spruce Line", SEED: "Paperbirch" };
+const EDIT_ART: Record<string, { category: string; brand: string }> = {
+  new: { category: "FLOWER", brand: "New" }, balanced: { category: "EDIBLE", brand: "Balanced" },
+  cbd: { category: "CAPSULE", brand: "CBD" }, under30: { category: "PRE_ROLL", brand: "Value" },
+};
 
 export default async function Home() {
   const v = await getVisitor();
   const policy = v.policy;
-  const res = policy ? await discover(policy, v.near, { sort: v.near ? "near" : "name" }) : null;
-  const cats = policy ? allowedCategories(policy, CATEGORIES).filter((c) => c !== "ACCESSORY") : CATEGORIES.slice(0, 6);
-  const canOrder = !!policy?.allows("orders.online");
+  const res = policy ? await discover(policy, v.near, { sort: "new" }) : null;
+  const listings = res ? toListings(res.products) : [];
+  const fresh = listings.filter((l) => l.best?.stock !== "OUT").slice(0, 8);
+  const brands = policy ? (await brandsFor(policy)).slice(0, 6) : [];
+  const stores = (res?.stores ?? []).slice(0, 3);
+  const cats = policy ? allowedCategories(policy, CATEGORIES).filter((c) => c !== "ACCESSORY") : [];
   const showPrices = !!policy?.allows("retail.prices");
-  // Interleave stores so the shelf shows the marketplace, not just the nearest shop.
-  const pool = (res?.products ?? []).filter((p) => p.best && p.best.stock !== "OUT");
-  const byStore = new Map<string, typeof pool>();
-  for (const p of pool) byStore.set(p.retailerId, [...(byStore.get(p.retailerId) ?? []), p]);
-  const picks: typeof pool = [];
-  const seen = new Set<string>();
-  for (let round = 0; picks.length < 10 && round < 20; round++) {
-    for (const list of byStore.values()) {
-      const p = list.find((x) => !seen.has(x.name));
-      if (p && picks.length < 10) { picks.push(p); seen.add(p.name); list.splice(list.indexOf(p), 1); }
-    }
-  }
-  const stores = (res?.stores ?? []).slice(0, 6);
-  const area = v.near?.label ?? policy?.name ?? "your area";
+  const canOrder = !!policy?.allows("orders.online");
+  const open = !!res && res.stores.length > 0;
+  const edits = (Object.keys(COLLECTIONS) as (keyof typeof COLLECTIONS)[]).filter((k) => k !== "under30" || showPrices);
 
   return (
     <>
-      <section className="wrap home-hero">
-        <div className="stack hero-copy" style={{ ["--gap" as string]: "22px" }}>
-          <h1 className="display">Licensed cannabis, ordered from stores near you.</h1>
+      <section className="wrap hero">
+        <div className="hero-copy">
+          <h1 className="display">Every licensed shelf, in one market.</h1>
           <p className="lede">
-            Browse what licensed stores in {policy?.name ?? "your province"} have on the shelf{canOrder ? ", order for pickup or delivery, and pay the store when it's handed over" : ", then buy in store"}. Every store's licence is checked before it's listed.
+            Browse what licensed stores in {policy?.name ?? "your province"} carry, compare offers across stores{canOrder ? ", and order for pickup or delivery. You pay the store when it's handed over" : ", then buy in store"}. No store is listed until its licence has been checked.
           </p>
           <form action="/shop" className="hero-search" role="search">
             <IconSearch aria-hidden />
@@ -46,32 +41,71 @@ export default async function Home() {
             <input id="hq" name="q" className="grow" placeholder="Search products, brands or stores" autoComplete="off" />
             <button className="btn primary">Search</button>
           </form>
-          {res && <p className="small muted">{res.products.length} products from {res.stores.length} licensed {res.stores.length === 1 ? "store" : "stores"}{v.near ? ` near ${v.near.label}` : ` in ${policy?.name}`}.</p>}
+          {open && <p className="small muted">{listings.length} listings from {res!.stores.length} licensed {res!.stores.length === 1 ? "store" : "stores"}{v.near ? ` near ${v.near.label}` : ""}.</p>}
         </div>
-        <nav className="shelf-wall" aria-label="Shop by format">
-          {cats.slice(0, 6).map((c) => (
-            <Link key={c} href={`/shop?category=${c}`} className="shelf" style={{ background: `var(--t-${c})` }}>
-              <span className="shelf-art"><PackArt p={{ category: c, brand: SHELF_BRANDS[c] ?? "Cairn", name: c }} /></span>
-              <span className="shelf-label">{CATEGORY_LABEL[c]}</span>
-            </Link>
-          ))}
-        </nav>
+        {!open && (
+          <div className="edit" aria-hidden>
+            {["FLOWER", "PRE_ROLL", "CAPSULE", "TOPICAL"].map((c) => (
+              <span key={c} className="edit-tile" style={{ background: `var(--t-${c})` }}>
+                <span className="edit-art"><PackArt p={{ category: c, brand: CATEGORY_LABEL[c].split(" ")[0], name: c }} /></span>
+                <span className="edit-title">{CATEGORY_LABEL[c]}</span>
+              </span>
+            ))}
+          </div>
+        )}
+        {open && (
+          <nav className="edit" aria-label="Collections">
+            {edits.map((k) => (
+              <Link key={k} href={`/shop?collection=${k}`} className="edit-tile" style={{ background: `var(--t-${EDIT_ART[k].category})` }}>
+                <span className="edit-art"><PackArt p={{ category: EDIT_ART[k].category, brand: EDIT_ART[k].brand, name: k }} /></span>
+                <span className="edit-title">{COLLECTIONS[k].title}</span>
+              </Link>
+            ))}
+          </nav>
+        )}
       </section>
 
-      {policy && !policy.allows("retail.directory") ? (
-        <section className="wrap section-tight">
-          <div className="callout"><p className="strong">No stores listed in {policy.name} yet</p><p className="muted small">{policy.offMessage("retail.directory")} Retail there is run by {policy.regulator}.</p></div>
+      {!open ? (
+        <section className="wrap opening">
+          <div className="opening-card">
+            <h2 className="h2">Opening in {policy?.name ?? "your province"}</h2>
+            <p className="muted">
+              {policy && !policy.allows("retail.directory")
+                ? `Cairn lists stores only once the rules for ${policy.name} have been reviewed. Retail there is licensed by ${policy.regulator}.`
+                : "Licensed stores are joining now. Each one appears here after its licence has been checked against the provincial registry."}
+            </p>
+            <div className="row">
+              <Link href="/for-stores" className="btn signal">List your licensed store</Link>
+              <Link href="/partners" className="btn">Become a partner</Link>
+            </div>
+          </div>
+          <ol className="opening-steps">
+            <li><span className="n">1</span><p className="strong">Stores apply</p><p className="small muted">With their provincial licence and locations.</p></li>
+            <li><span className="n">2</span><p className="strong">We check every licence</p><p className="small muted">Against the regulator's public registry, by a person.</p></li>
+            <li><span className="n">3</span><p className="strong">Shelves open</p><p className="small muted">Menus, live stock, pickup and delivery where permitted.</p></li>
+          </ol>
         </section>
       ) : (
         <>
-          {picks.length > 0 && (
-            <section className="wrap section-tight" aria-labelledby="near-picks">
-              <div className="row between mb-3">
-                <h2 id="near-picks" className="h2">{canOrder ? `In stock near ${area}` : `On the shelf near ${area}`}</h2>
-                <Link href="/shop" className="btn sm">Shop all</Link>
+          {cats.length > 0 && (
+            <section className="wrap sec" aria-labelledby="formats">
+              <div className="section-head"><h2 id="formats" className="h2">Shop by format</h2><Link href="/shop">Shop all</Link></div>
+              <div className="formats">
+                {cats.map((c) => (
+                  <Link key={c} href={`/shop?category=${c}`} className="format" style={{ background: `var(--t-${c})` }}>
+                    <span className="format-art"><PackArt p={{ category: c, brand: CATEGORY_LABEL[c].split(" ")[0], name: c }} /></span>
+                    <span className="format-name">{CATEGORY_LABEL[c]}</span>
+                  </Link>
+                ))}
               </div>
+            </section>
+          )}
+
+          {fresh.length > 0 && (
+            <section className="wrap sec" aria-labelledby="new">
+              <div className="section-head"><h2 id="new" className="h2">New on the shelves</h2><Link href="/shop?collection=new">View all</Link></div>
               <div className="pgrid">
-                {picks.map((p) => (
+                {fresh.map((p) => (
                   <ProductCard key={p.id} p={p} store={{ name: p.retailer.tradeName, slug: p.retailer.slug }} showPrice={showPrices}
                     orderable={orderBlock(policy!, p.retailer)} stock={p.best?.stock} distance={p.best?.distance} />
                 ))}
@@ -79,76 +113,89 @@ export default async function Home() {
             </section>
           )}
 
-          {stores.length > 0 && (
-            <section className="wrap section-tight" aria-labelledby="stores-near">
-              <div className="row between mb-3">
-                <h2 id="stores-near" className="h2">Stores {v.near ? "nearby" : `in ${policy?.name}`}</h2>
-                <Link href="/stores" className="btn sm">All stores</Link>
-              </div>
-              <div className="store-grid">
-                {stores.map((r) => <StoreCard key={r.id} r={r} policy={policy!} />)}
+          {brands.length > 0 && (
+            <section className="wrap sec" aria-labelledby="brands">
+              <div className="section-head"><h2 id="brands" className="h2">Brands on Cairn</h2><Link href="/brands">All brands</Link></div>
+              <div className="brand-row">
+                {brands.map((b) => (
+                  <Link key={b.slug} href={`/brands/${b.slug}`} className="brand-tile">
+                    <span className="bt-name">{b.name}</span>
+                    <span className="xs muted">{b.productCount} {b.productCount === 1 ? "product" : "products"}, {b.storeCount} {b.storeCount === 1 ? "store" : "stores"}</span>
+                  </Link>
+                ))}
               </div>
             </section>
           )}
+
+          {stores.length > 0 && (
+            <section className="wrap sec" aria-labelledby="stores">
+              <div className="section-head"><h2 id="stores" className="h2">{v.near ? "Stores near you" : `Stores in ${policy?.name}`}</h2><Link href="/stores">All stores</Link></div>
+              <div className="store-grid">{stores.map((r) => <StoreCard key={r.id} r={r} policy={policy!} />)}</div>
+            </section>
+          )}
+
+          <section className="wrap sec" aria-labelledby="how">
+            <div className="section-head"><h2 id="how" className="h2">How ordering works</h2><Link href="/how-it-works">How we check stores</Link></div>
+            <ol className="how">
+              <li><span className="how-n">1</span><div><p className="h4">One store per order</p><p className="muted small">Compare offers, then fill a cart from the store you choose.</p></div></li>
+              <li><span className="how-n">2</span><div><p className="h4">The store confirms</p><p className="muted small">You're notified when it's being prepared and when it's ready.</p></div></li>
+              <li><span className="how-n">3</span><div><p className="h4">ID, then payment</p><p className="muted small">The store checks government ID and takes payment at handover.</p></div></li>
+            </ol>
+          </section>
         </>
       )}
-
-      <section className="wrap section-tight" aria-labelledby="how">
-        <h2 id="how" className="h2 mb-3">How ordering works</h2>
-        <ol className="how">
-          <li><span className="how-n">1</span><div><p className="h4">Fill a cart from one store</p><p className="muted small">Each order comes from a single licensed store, so it's prepared and handed over in one go.</p></div></li>
-          <li><span className="how-n">2</span><div><p className="h4">The store accepts it</p><p className="muted small">You'll get a notification when it's being prepared and when it's ready, with a time estimate.</p></div></li>
-          <li><span className="how-n">3</span><div><p className="h4">Show ID and pay the store</p><p className="muted small">At the counter or at your door. The store checks government ID and takes payment. Cairn never does.</p></div></li>
-        </ol>
-        <p className="small muted mt-3">Orders follow the 30 g public-possession limit, counted from each product's dried-cannabis equivalent. <Link href="/how-it-works">How we check stores</Link></p>
-      </section>
 
       <section className="band" aria-label="Work with Cairn">
         <div className="wrap grid-2 section">
           <div className="stack">
             <h2 className="h2">Sell on Cairn</h2>
-            <p>Licensed retailers list their menu, take pickup and delivery orders, and see which partners send them customers. Every store's licence is reviewed before it goes live.</p>
+            <p>A storefront, live menu, pickup and delivery orders, and partners who send customers your way. Every store is licence-checked before it opens.</p>
             <Link href="/for-stores" className="btn signal">List your store</Link>
           </div>
           <div className="stack">
             <h2 className="h2">Recommend stores you trust</h2>
             <p>Verified partners share links to stores they know and see what their recommendations lead to. Partners never sell or handle product.</p>
-            <Link href="/partners" className="btn">About the partner program</Link>
+            <Link href="/partners" className="btn">About partners</Link>
           </div>
         </div>
       </section>
 
       <style>{`
-        .home-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(28px, 5vw, 72px); align-items: center; padding-block: clamp(28px, 5vw, 64px); }
-        .hero-search { display: flex; align-items: center; gap: 10px; max-width: 560px; height: 58px; padding: 0 6px 0 20px; background: var(--surface); border: 1.5px solid var(--ink); border-radius: 999px; }
-        .hero-search:focus-within { box-shadow: 0 0 0 4px color-mix(in srgb, var(--lake) 18%, transparent); }
+        .hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: clamp(32px, 6vw, 96px); align-items: end; padding-block: clamp(40px, 7vw, 104px) clamp(32px, 5vw, 72px); }
+        .hero-copy { display: grid; gap: 26px; min-width: 0; }
+        .hero-search { max-width: 100%; }
+        .hero-search { display: flex; align-items: center; gap: 10px; max-width: 580px; height: 58px; padding: 0 6px 0 18px; background: var(--surface); border: 1px solid var(--ink); }
         .hero-search input { border: 0; background: transparent; height: 100%; font-size: max(16px, var(--t-md)); outline: none; min-width: 0; }
-        .shelf-wall { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-        .shelf { position: relative; display: grid; aspect-ratio: 1 / 1.08; border-radius: var(--r-tile); text-decoration: none; color: var(--ink); overflow: hidden; transition: transform .2s var(--ease); }
-        .shelf:hover { transform: translateY(-3px); }
-        .shelf-art { padding: 10% 14% 22%; animation: rise-in .6s var(--ease) both; }
-        .shelf:nth-child(2) .shelf-art { animation-delay: .06s } .shelf:nth-child(3) .shelf-art { animation-delay: .12s }
-        .shelf:nth-child(4) .shelf-art { animation-delay: .18s } .shelf:nth-child(5) .shelf-art { animation-delay: .24s } .shelf:nth-child(6) .shelf-art { animation-delay: .3s }
-        @keyframes rise-in { from { transform: translateY(14px); opacity: 0; } }
-        .shelf-label { position: absolute; left: 14px; bottom: 12px; font-weight: 650; font-size: var(--t-base); }
-        .section-tight { padding-block: clamp(28px, 4.5vw, 56px); }
-        .store-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-        .how { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-        .how li { display: flex; gap: 14px; padding: 20px; background: var(--surface); border-radius: var(--r-panel); }
-        .how-n { flex: none; width: 34px; height: 34px; border-radius: 999px; background: var(--sun); display: grid; place-items: center; font-weight: 700; color: #1f2148; }
-        .how li > div { display: grid; gap: 4px; align-content: start; }
-        .band { background: var(--indigo); color: #eef0f6; margin-top: var(--s6); }
-        .band .btn:not(.signal) { --b-bg: transparent; --b-fg: #eef0f6; --b-bd: #565a8f; }
-        @media (max-width: 900px) {
-          .home-hero { grid-template-columns: 1fr; }
-          .how { grid-template-columns: 1fr; }
-        }
-        @media (max-width: 760px) {
-          .shelf-wall { grid-template-columns: repeat(3, 1fr); gap: 8px; }
-          .shelf-label { font-size: 12px; left: 10px; bottom: 8px; }
-          .hero-search { height: 52px; }
-          .store-grid { grid-template-columns: 1fr; }
-        }
+        .hero-search .btn { height: 44px; }
+        .edit { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .edit-tile { position: relative; display: block; aspect-ratio: 1 / 1.05; color: var(--ink); text-decoration: none; overflow: hidden; }
+        .edit-art { position: absolute; inset: 10% 18% 26%; display: block; transition: transform .6s var(--ease); }
+        .edit-tile:hover .edit-art { transform: scale(1.05); }
+        .edit-title { position: absolute; left: 16px; right: 16px; bottom: 14px; font-family: var(--font-display); font-size: clamp(1.1rem, 1.6vw, 1.45rem); font-weight: 500; line-height: 1.1; }
+        .sec { padding-block: clamp(36px, 5vw, 72px); }
+        .formats { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 1fr); gap: 12px; overflow-x: auto; scrollbar-width: none; }
+        .format { position: relative; aspect-ratio: 3 / 4; color: var(--ink); text-decoration: none; }
+        .format-art { position: absolute; inset: 14% 16% 30%; }
+        .format-name { position: absolute; left: 14px; bottom: 12px; font-family: var(--font-display); font-size: 1.2rem; }
+        .brand-row { display: grid; grid-template-columns: repeat(6, 1fr); border-top: 1px solid var(--rule); border-left: 1px solid var(--rule); }
+        .brand-tile { display: grid; gap: 6px; align-content: center; justify-items: center; text-align: center; padding: 36px 12px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); color: var(--ink); text-decoration: none; transition: background .2s; }
+        .brand-tile:hover { background: var(--surface); }
+        .bt-name { font-family: var(--font-display); font-size: 1.45rem; font-style: italic; }
+        .store-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+        .how { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
+        .how li { display: flex; gap: 16px; padding: 0; background: none; }
+        .how-n { flex: none; font-family: var(--font-display); font-size: 2.6rem; line-height: .9; color: var(--brass); }
+        .how li > div { display: grid; gap: 6px; align-content: start; }
+        .band { color: #f1eff3; margin-top: var(--s6); }
+        .band .btn:not(.signal) { --b-bg: transparent; --b-fg: #f1eff3; --b-bd: #57505f; }
+        .opening { display: grid; grid-template-columns: 1.2fr 1fr; gap: 48px; padding-block: 24px 96px; align-items: start; }
+        .opening-card { display: grid; gap: 18px; padding: 40px; background: var(--surface); border: 1px solid var(--rule); }
+        .opening-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 28px; }
+        .opening-steps li { display: grid; grid-template-columns: 48px 1fr; column-gap: 12px; }
+        .opening-steps .n { grid-row: span 2; font-family: var(--font-display); font-size: 2.4rem; line-height: 1; color: var(--brass); }
+        @media (max-width: 1000px) { .brand-row { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 900px) { .hero, .opening { grid-template-columns: minmax(0, 1fr); } .how { grid-template-columns: 1fr; gap: 24px; } }
+        @media (max-width: 760px) { .store-grid { grid-template-columns: 1fr; } .brand-row { grid-template-columns: 1fr 1fr; } .opening-card { padding: 24px; } .formats { grid-auto-columns: 42%; } }
       `}</style>
     </>
   );

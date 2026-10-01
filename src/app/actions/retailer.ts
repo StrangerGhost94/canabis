@@ -231,7 +231,12 @@ export async function saveStoreProfile(_: ActionState, form: FormData): Promise<
     }).parse({ tradeName: form.get("tradeName"), about: form.get("about") || undefined, website: form.get("website") ?? "", orderingUrl: form.get("orderingUrl") ?? "" });
     const issue = screenCopy(d.about);
     if (issue) throw new z.ZodError([{ code: "custom", path: ["about"], message: issue }]);
-    await db.update(schema.retailers).set({ tradeName: d.tradeName, about: d.about ?? null, website: d.website, orderingUrl: d.orderingUrl }).where(eq(schema.retailers.id, retailer.id));
+    const media: { logoKey?: string; coverKey?: string } = {};
+    const logo = form.get("logo");
+    const cover = form.get("cover");
+    if (logo instanceof File && logo.size > 0) media.logoKey = await storeMedia(logo);
+    if (cover instanceof File && cover.size > 0) media.coverKey = await storeMedia(cover);
+    await db.update(schema.retailers).set({ tradeName: d.tradeName, about: d.about ?? null, website: d.website, orderingUrl: d.orderingUrl, ...media }).where(eq(schema.retailers.id, retailer.id));
     await audit({ actorId: user.id, action: "retailer.update_profile", targetType: "retailer", targetId: retailer.id, metadata: { orderingUrl: d.orderingUrl } });
     revalidatePath("/retailer", "layout");
     return ok("Store profile saved.");

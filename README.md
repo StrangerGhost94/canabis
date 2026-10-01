@@ -21,6 +21,12 @@ Demo accounts (password `cairn-demo-2026`): `customer@`, `morgan@`, `retailer@`,
 
 Production: `npm run build && npm start`. Set `DEMO_MODE=false`, a strong `SESSION_SECRET`, `HASH_SALT`, `CRON_SECRET`, and schedule `POST /api/cron/licences` daily with header `x-cron-secret`.
 
+## Going live (real mode)
+- Set `DEMO_MODE=false`. On the next deploy, the pre-deploy step (`npm run db:migrate && npm run db:seed`) deletes every demo store, account, order and simulated rule setting. It is idempotent and never touches real data.
+- Set `ADMIN_EMAIL` to your address, then **sign up on the site with that email**. That account becomes the platform administrator; no admin password is stored in settings.
+- In **Admin → Jurisdiction rules**, record a legal basis for each capability you want on (listing, prices, ordering, pickup, delivery, vapes, edibles, partners) per province. Everything stays off until you do.
+- Stores sign up at **List your store**, upload their licence, and appear once you verify them in **Admin → Verification queue**.
+
 ## Deploy on Railway
 1. Push this repo to GitHub and create a Railway project from it.
 2. Add a **PostgreSQL** service; Railway exposes `DATABASE_URL` — reference it in the app service's variables.

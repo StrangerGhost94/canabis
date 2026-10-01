@@ -68,8 +68,13 @@ export default async function StorePage({ params, searchParams }: { params: Prom
 
   return (
     <div className="wrap store">
-      <header className="store-hero">
-        <span className="scard-mark big" aria-hidden>{r.tradeName.slice(0, 1)}</span>
+      {r.coverKey && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img className="store-cover" src={`/media/${r.coverKey}`} alt={`${r.tradeName} storefront`} />
+      )}
+      <header className={`store-hero ${r.coverKey ? "on-cover" : ""}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <span className="scard-mark big" aria-hidden>{r.logoKey ? <img src={`/media/${r.logoKey}`} alt="" /> : r.tradeName.slice(0, 1)}</span>
         <div className="stack grow" style={{ ["--gap" as string]: "10px", minWidth: 0 }}>
           <div className="row" style={{ ["--gap" as string]: "10px" }}>
             <h1 className="h1">{r.tradeName}</h1>
@@ -78,7 +83,7 @@ export default async function StorePage({ params, searchParams }: { params: Prom
           </div>
           {r.about && <p className="muted" style={{ maxWidth: "62ch" }}>{r.about}</p>}
           <div className="row" style={{ ["--gap" as string]: "8px" }}>
-            <TrustButton title="Licence record" trigger={<><CairnMark trust={t} size={16} label={false} /><span>{t.state === "simulated" ? "Licensed store (demo check)" : "Licensed store"}</span><span className="more">View licence</span></>}>{record}</TrustButton>
+            <TrustButton title="Licence record" trigger={<><CairnMark trust={t} size={16} label={false} /><span className="seal">{t.state === "simulated" ? "Licensed store (demo check)" : "Licensed store"}</span><span className="more">View licence</span></>}>{record}</TrustButton>
             {o && <span className={`status ${o.open ? "ok" : "idle"}`}>{o.label}</span>}
             {pickup && <span className="tag">Pickup in about {r.pickupLeadMinutes} min</span>}
             {delivery && <span className="tag">Delivery {money(r.deliveryFeeCents)}, {money(r.deliveryMinimumCents)} minimum</span>}
@@ -147,8 +152,11 @@ export default async function StorePage({ params, searchParams }: { params: Prom
       </div>
       <style>{`
         .store { padding-block: var(--s5) var(--s8); }
-        .store-hero { display: flex; gap: 20px; align-items: flex-start; padding: 24px; background: var(--surface); border-radius: var(--r-panel); margin-bottom: var(--s6); }
-        .scard-mark.big { width: 76px; height: 76px; font-size: 2.2rem; border-radius: 20px; }
+        .store-cover { width: 100%; height: clamp(180px, 28vw, 360px); object-fit: cover; display: block; }
+        .store-hero { display: flex; gap: 24px; align-items: flex-start; padding: 32px; background: var(--surface); border: 1px solid var(--rule); margin-bottom: var(--s6); }
+        .store-hero.on-cover { margin: -64px 24px var(--s6); position: relative; }
+        .store-hero .h1 { font-size: clamp(2.2rem, 4vw, 3.4rem); }
+        .scard-mark.big { width: 88px; height: 88px; font-size: 2.6rem; }
         .store-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--s6); align-items: start; }
         .store-side { position: sticky; top: 130px; }
         .loc-opt { display: grid; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--rule); color: var(--ink); text-decoration: none; }

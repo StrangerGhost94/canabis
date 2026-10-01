@@ -59,6 +59,10 @@ export function StoreProfileForm({ r }: { r: { tradeName: string; about: string 
             <textarea id="about" name="about" className="textarea" maxLength={400} defaultValue={s?.values?.about ?? r.about ?? ""} />
           </Field>
           <Field name="website" label="Website" state={s}><Input name="website" type="url" defaultValue={r.website ?? ""} placeholder="https://" state={s} /></Field>
+          <div className="form-row">
+            <Field name="logo" label="Logo" hint="Square JPEG or PNG, up to 4 MB." state={s}><input id="logo" name="logo" type="file" accept="image/jpeg,image/png" className="input" /></Field>
+            <Field name="cover" label="Storefront cover photo" hint="Wide photo of your store, up to 4 MB. No product or consumption imagery." state={s}><input id="cover" name="cover" type="file" accept="image/jpeg,image/png" className="input" /></Field>
+          </div>
           <div><Submit pending="Saving…">Save profile</Submit></div>
         </>
       )}

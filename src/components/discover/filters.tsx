@@ -28,7 +28,7 @@ export function Filters({ categories, showPrice, activeCount }: Props) {
       onSubmit={(e) => { e.preventDefault(); apply(e.currentTarget); sheet.current?.close(); }}
       aria-busy={pending}
     >
-      {["q", "sort"].map((k) => sp.get(k) && <input key={k} type="hidden" name={k} value={sp.get(k)!} />)}
+      {["q", "sort", "brand", "collection"].map((k) => sp.get(k) && <input key={k} type="hidden" name={k} value={sp.get(k)!} />)}
       <fieldset>
         <legend>Format</legend>
         <div className="seg">

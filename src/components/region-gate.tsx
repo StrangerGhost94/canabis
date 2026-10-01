@@ -35,8 +35,8 @@ export function RegionGate({ jurisdictions, current, next, dismissible = false, 
               </div>
               <input type="hidden" name="next" value={next} />
               <div className="field">
-                <label htmlFor="region">Province or territory</label>
-                <select id="region" name="region" className="select" value={code} onChange={(e) => setCode(e.target.value)} aria-invalid={state?.fields?.region ? true : undefined}>
+                <label htmlFor="gate-region">Province or territory</label>
+                <select id="gate-region" name="region" className="select" value={code} onChange={(e) => setCode(e.target.value)} aria-invalid={state?.fields?.region ? true : undefined}>
                   <option value="" disabled>Choose…</option>
                   {jurisdictions.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}
                 </select>
@@ -64,7 +64,6 @@ export function RegionGate({ jurisdictions, current, next, dismissible = false, 
 export function ChangeRegionButton({ label, className = "region-pill" }: { label: string; className?: string }) {
   return (
     <button type="button" className={className} onClick={() => (document.getElementById("region-gate") as HTMLDialogElement | null)?.showModal()}>
-      <span className="cairn verified" style={{ ["--cs" as string]: "12px" }} aria-hidden><i className="on" /><i className="on" /><i className="on" /></span>
       {label}
     </button>
   );

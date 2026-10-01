@@ -6,7 +6,7 @@ import { ProductCard } from "@/components/product-card";
 import { StoreCard } from "@/components/store-card";
 import { allowedCategories } from "@/lib/compliance";
 import { CATEGORIES, CATEGORY_LABEL, n } from "@/lib/format";
-import { discover, orderBlock, parseDiscover } from "@/lib/queries";
+import { COLLECTIONS, discover, orderBlock, parseDiscover, toListings } from "@/lib/queries";
 import { getVisitor } from "@/lib/visitor";
 
 export const metadata = { title: "Shop" };
@@ -27,14 +27,17 @@ export default async function Shop({ searchParams }: { searchParams: Promise<Rec
   const sort = p.sort ?? (v.near ? "near" : "name");
   const sortHref = (s: string) => { const q = new URLSearchParams(qs); q.set("sort", s); return `/shop?${q}`; };
   const storeHits = p.q ? stores.filter((r) => r.tradeName.toLowerCase().includes(p.q!.toLowerCase())) : [];
-  const title = p.q ? `Results for “${p.q}”` : p.category ? CATEGORY_LABEL[p.category] : "All products";
+  const listings = toListings(products);
+  const brandName = p.brand ? products.find((x) => x.brand.toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/[\s_]+/g, "-") === p.brand)?.brand : null;
+  const collection = p.collection ? COLLECTIONS[p.collection] : null;
+  const title = p.q ? `Results for “${p.q}”` : collection ? collection.title : brandName ?? (p.category ? CATEGORY_LABEL[p.category] : "Shop all");
 
   return (
     <div className="wrap shop">
       <div className="shop-head">
         <div>
           <h1 className="h1">{title}</h1>
-          <p className="small muted mt-1" aria-live="polite">{n(products.length)} {products.length === 1 ? "product" : "products"} from licensed stores in {policy.name}</p>
+          <p className="small muted mt-1" aria-live="polite">{collection ? `${collection.blurb} ` : ""}{n(listings.length)} {listings.length === 1 ? "listing" : "listings"} from {n(new Set(products.map((x) => x.retailerId)).size)} licensed stores in {policy.name}</p>
         </div>
         <NearControl label={v.near?.label ?? null} next={here} />
       </div>
@@ -49,7 +52,7 @@ export default async function Shop({ searchParams }: { searchParams: Promise<Rec
           <div className="row between mb-3 shop-bar">
             <div className="row small" style={{ ["--gap" as string]: "6px" }}>
               <span className="muted">Sort</span>
-              {[...(v.near ? [["near", "Nearest"]] : []), ["name", "Name"], ...(showPrices ? [["price", "Price"]] : []), ["potency", "THC"]].map(([k, l]) => (
+              {[...(v.near ? [["near", "Nearest"]] : []), ["new", "Newest"], ["name", "Name"], ...(showPrices ? [["price", "Price"]] : []), ["potency", "THC"]].map(([k, l]) => (
                 <Link key={k} href={sortHref(k)} className={`chip ${sort === k ? "on" : ""}`} aria-current={sort === k ? "true" : undefined}>{l}</Link>
               ))}
             </div>
@@ -66,7 +69,7 @@ export default async function Shop({ searchParams }: { searchParams: Promise<Rec
             <div className="callout"><p className="strong">No stores listed in {policy.name} yet</p><p className="small muted">{policy.offMessage("retail.directory")}</p></div>
           ) : !policy.allows("retail.products") ? (
             <div className="callout"><p className="strong">Products aren't shown in {policy.name}</p><p className="small muted">{policy.offMessage("retail.products")} <Link href="/stores">Browse stores</Link></p></div>
-          ) : products.length === 0 ? (
+          ) : listings.length === 0 ? (
             <div className="empty panel">
               <span className="cairn" aria-hidden><i /><i /><i /></span>
               <p className="h4">{p.q ? `Nothing matches “${p.q}”` : "Nothing matches these filters"}</p>
@@ -75,7 +78,7 @@ export default async function Shop({ searchParams }: { searchParams: Promise<Rec
             </div>
           ) : (
             <div className="pgrid">
-              {products.map((x) => (
+              {listings.map((x) => (
                 <ProductCard key={x.id} p={x} store={{ name: x.retailer.tradeName, slug: x.retailer.slug }} showPrice={showPrices}
                   orderable={orderBlock(policy, x.retailer)} stock={x.best?.stock} distance={x.best?.distance} />
               ))}
@@ -89,7 +92,8 @@ export default async function Shop({ searchParams }: { searchParams: Promise<Rec
         .shop-head { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--s4); flex-wrap: wrap; padding-bottom: var(--s5); }
         .shop-search { margin-bottom: var(--s3); }
         .shop-body { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: var(--s6); }
-        .filter-rail { position: sticky; top: 130px; align-self: start; max-height: calc(100dvh - 150px); overflow-y: auto; padding: 20px; background: var(--surface); border-radius: var(--r-panel); }
+        .filter-rail { position: sticky; top: 150px; align-self: start; max-height: calc(100dvh - 170px); overflow-y: auto; padding: 4px 4px 4px 0; }
+        .shop-head .h1 { font-size: clamp(2.2rem, 4vw, 3.4rem); }
         .filters legend { font-size: var(--t-sm); }
         .near-form { max-width: 360px; }
         .store-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
