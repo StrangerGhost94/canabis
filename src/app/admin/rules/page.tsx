@@ -14,7 +14,6 @@ export default async function Rules() {
         <span style={{ ["--c" as string]: "var(--moss)" }}>Permitted</span>
         <span style={{ ["--c" as string]: "var(--red)" }}>Not permitted</span>
         <span style={{ ["--c" as string]: "var(--stone)" }}>Not yet reviewed (off)</span>
-        <span style={{ ["--c" as string]: "var(--amber)" }}>Demo setting</span>
       </div>
       <div className="panel table-wrap">
         <table className="matrix">
@@ -30,7 +29,7 @@ export default async function Rules() {
                   const st = r?.status ?? "UNCONFIRMED";
                   return (
                     <td key={j.code} className="c">
-                      <Link href={`/admin/rules/${j.code}#${k}`} aria-label={`${j.name}: ${RULES[k].label}, ${st.toLowerCase()}${r?.isDemo ? " (demo)" : ""}`} className={`cell ${st} ${r?.isDemo ? "demo" : ""}`} />
+                      <Link href={`/admin/rules/${j.code}#${k}`} aria-label={`${j.name}: ${RULES[k].label}, ${st.toLowerCase()}`} className={`cell ${st}`} />
                     </td>
                   );
                 })}
@@ -45,7 +44,6 @@ export default async function Rules() {
         .cell { display: inline-block; width: 18px; height: 18px; border-radius: 5px; background: var(--rule-soft); box-shadow: inset 0 0 0 1px var(--rule); vertical-align: middle; }
         .cell.ALLOWED { background: var(--moss); box-shadow: none; }
         .cell.PROHIBITED { background: var(--red); box-shadow: none; }
-        .cell.demo { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--amber); }
       `}</style>
     </>
   );

@@ -16,7 +16,7 @@ export const listedRetailers = cache(async (region: string) => {
       eq(schema.retailers.jurisdictionCode, region),
       eq(schema.retailers.status, "VERIFIED"),
       sql`exists (select 1 from licences l where l.retailer_id = ${schema.retailers.id}
-                  and l.status = 'VERIFIED' and l.expires_at >= ${today()})`,
+                  and l.status = 'VERIFIED' and l.method is distinct from 'DEMO_SIMULATED' and l.expires_at >= ${today()})`,
     ),
     with: {
       locations: { where: eq(schema.locations.active, true) },

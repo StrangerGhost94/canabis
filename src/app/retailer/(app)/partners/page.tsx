@@ -33,7 +33,7 @@ export default async function RetailerPartners() {
             {requested.map((t) => (
               <li key={t.partnerId} className="row between" style={{ padding: "16px 0" }}>
                 <div className="grow" style={{ minWidth: 240 }}>
-                  <p className="strong">{t.partner.displayName} <span className="muted small">@{t.partner.handle}</span>{t.partner.isDemo && <span className="tag demo" style={{ marginLeft: 8 }}>Demo</span>}</p>
+                  <p className="strong">{t.partner.displayName} <span className="muted small">@{t.partner.handle}</span></p>
                   <p className="small muted">{t.partner.audience}</p>
                   <p className="xs muted">Requested {relTime(t.createdAt)}. <Link href={`/p/${t.partner.handle}`}>View profile</Link></p>
                 </div>

@@ -6,7 +6,7 @@ import type { Trust } from "@/lib/verification/trust";
 type Loc = { id: string; name: string; street: string; city: string; jurisdictionCode: string; hours: { d: number; open: string; close: string }[]; offersPickup: boolean; offersDelivery: boolean; distance?: number | null };
 
 export function StoreCard({ r, policy }: {
-  r: { id: string; slug: string; tradeName: string; isDemo: boolean; logoKey?: string | null; coverKey?: string | null; acceptsOrders: boolean; trust: Trust; locations: Loc[]; locs?: Loc[]; matches?: number };
+  r: { id: string; slug: string; tradeName: string; logoKey?: string | null; coverKey?: string | null; acceptsOrders: boolean; trust: Trust; locations: Loc[]; locs?: Loc[]; matches?: number };
   policy: Policy;
 }) {
   const locs = r.locs ?? r.locations;
@@ -22,10 +22,9 @@ export function StoreCard({ r, policy }: {
       <span className="scard-body">
         <span className="row" style={{ ["--gap" as string]: "8px" }}>
           <span className="scard-name">{r.tradeName}</span>
-          {r.isDemo && <span className="tag demo">Demo</span>}
         </span>
         <span className="xs row" style={{ ["--gap" as string]: "6px" }}>
-          <span className="seal">{r.trust.state === "simulated" ? "Licensed (demo check)" : "Licensed store"}</span>
+          <span className="seal">Licensed store</span>
         </span>
         {first && <span className="small muted">{first.name}, {first.city}{locs.length > 1 ? ` and ${locs.length - 1} more` : ""}{first.distance != null ? `, ${fmtKm(first.distance)}` : ""}</span>}
         <span className="row xs" style={{ ["--gap" as string]: "6px", marginTop: 6 }}>

@@ -4,7 +4,6 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: { default: "Cairn — licensed cannabis stores in Canada", template: "%s — Cairn" },
   description: "A directory of provincially licensed cannabis retailers in Canada. See what stores carry and the licence behind each one.",
-  robots: { index: process.env.DEMO_MODE !== "true" },
   icons: { icon: "/icon.svg" },
 };
 

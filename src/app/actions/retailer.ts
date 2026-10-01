@@ -11,7 +11,7 @@ import { requireRole } from "@/lib/auth/session";
 import { getPolicy } from "@/lib/compliance";
 import { screenCopy } from "@/lib/compliance/copy-check";
 import { randomToken, sha256, shortCode } from "@/lib/crypto";
-import { resolvePlace } from "@/lib/geo";
+import { geocode } from "@/lib/geo";
 import { notify } from "@/lib/notify";
 import { storeDocument, storeMedia } from "@/lib/uploads";
 import { adminIds } from "@/lib/verification/sweep";
@@ -57,7 +57,7 @@ export async function createStore(_: ActionState, form: FormData): Promise<Actio
     const file = form.get("document");
     if (!(file instanceof File) || file.size === 0) throw new z.ZodError([{ code: "custom", path: ["document"], message: "Attach a copy of your licence." }]);
 
-    const place = resolvePlace(d.postalCode);
+    const place = await geocode(`${d.street}, ${d.city} ${d.postalCode}`) ?? await geocode(d.postalCode);
     const [lat, lng] = place && place.jur === user.jurisdictionCode ? [place.lat, place.lng] : CENTROIDS[user.jurisdictionCode];
     let slug = slugify(d.tradeName) || "store";
     if (await db.query.retailers.findFirst({ where: eq(schema.retailers.slug, slug) })) slug = `${slug}-${shortCode(4)}`;
@@ -204,7 +204,7 @@ export async function saveLocation(_: ActionState, form: FormData): Promise<Acti
       await db.update(schema.locations).set({ name: d.name, street: d.street, city: d.city, postalCode: d.postalCode, phone: d.phone ?? null, hours, ...flags }).where(eq(schema.locations.id, d.id));
       await audit({ actorId: user.id, action: "location.update", targetType: "location", targetId: d.id });
     } else {
-      const place = resolvePlace(d.postalCode);
+      const place = await geocode(`${d.street}, ${d.city} ${d.postalCode}`) ?? await geocode(d.postalCode);
       const [lat, lng] = place?.jur === retailer.jurisdictionCode ? [place.lat, place.lng] : CENTROIDS[retailer.jurisdictionCode];
       // A new location needs its own licence in most provinces; it stays inactive until reviewed.
       const [loc] = await db.insert(schema.locations).values({ retailerId: retailer.id, name: d.name, street: d.street, city: d.city, postalCode: d.postalCode, phone: d.phone ?? null, jurisdictionCode: retailer.jurisdictionCode, lat, lng, geoApproximate: place?.jur !== retailer.jurisdictionCode, hours, active: false, ...flags }).returning();

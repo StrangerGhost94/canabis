@@ -4,7 +4,6 @@ import { db, schema } from "@/db";
 import { LicenceReviewForm, PartnerReviewForm } from "@/components/admin/forms";
 import { ConsoleHead } from "@/components/console/shell";
 import { getPolicy } from "@/lib/compliance";
-import { isDemo } from "@/lib/env";
 import { relTime } from "@/lib/format";
 import { fmtDate } from "@/lib/verification/trust";
 
@@ -30,7 +29,7 @@ export default async function Verification({ searchParams }: { searchParams: Pro
               return (
                 <article key={l.id} className="panel review">
                   <div className="panel-pad stack" style={{ ["--gap" as string]: "12px" }}>
-                    <div className="row" style={{ ["--gap" as string]: "8px" }}><h2 className="h3">{l.retailer.tradeName}</h2>{l.isDemo && <span className="tag demo">Demo</span>}</div>
+                    <div className="row" style={{ ["--gap" as string]: "8px" }}><h2 className="h3">{l.retailer.tradeName}</h2></div>
                     <dl className="kv">
                       <dt>Licence number</dt><dd className="num strong">{l.number}</dd>
                       <dt>Holder</dt><dd>{l.holderName}</dd>
@@ -43,7 +42,7 @@ export default async function Verification({ searchParams }: { searchParams: Pro
                     {l.reviewNotes && <p className="callout warn small">{l.reviewNotes}</p>}
                     <p className="small">Check against: {policy.registryUrl ? <a href={policy.registryUrl} target="_blank" rel="noreferrer">{policy.regulator} registry</a> : <span>{policy.regulator} public registry</span>}. Confirm the number, holder, address and expiry all match.</p>
                   </div>
-                  <div className="panel-pad review-form"><LicenceReviewForm licenceId={l.id} demoAllowed={isDemo} isDemoLicence={l.number.startsWith("DEMO-")} /></div>
+                  <div className="panel-pad review-form"><LicenceReviewForm licenceId={l.id} /></div>
                 </article>
               );
             }))}
@@ -54,7 +53,7 @@ export default async function Verification({ searchParams }: { searchParams: Pro
           {partners.map((p) => (
             <article key={p.id} className="panel review">
               <div className="panel-pad stack" style={{ ["--gap" as string]: "12px" }}>
-                <div className="row" style={{ ["--gap" as string]: "8px" }}><h2 className="h3">{p.displayName}</h2><span className="muted">@{p.handle}</span>{p.isDemo && <span className="tag demo">Demo</span>}</div>
+                <div className="row" style={{ ["--gap" as string]: "8px" }}><h2 className="h3">{p.displayName}</h2><span className="muted">@{p.handle}</span></div>
                 <dl className="kv">
                   <dt>Account</dt><dd>{p.user.email}</dd>
                   <dt>Province</dt><dd>{p.jurisdictionCode}</dd>

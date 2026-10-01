@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { db, schema } from "@/db";
-import { DemoRibbon } from "@/components/demo-ribbon";
 import { OnboardingForm } from "@/components/retailer/forms";
 import { requireRole } from "@/lib/auth/session";
 import { getPolicy } from "@/lib/compliance";
@@ -15,7 +14,6 @@ export default async function Onboarding() {
   const policy = await getPolicy(user.jurisdictionCode);
   return (
     <>
-      <DemoRibbon />
       <div className="wrap section" style={{ maxWidth: 760 }}>
         <Link href="/" className="brand mb-3"><span className="cairn" aria-hidden><i /><i /><i /></span>Cairn</Link>
         <h1 className="h1 mt-3">List your store</h1>

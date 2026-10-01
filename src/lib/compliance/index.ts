@@ -14,7 +14,6 @@ export type Policy = {
   /** true only for an ALLOWED determination */
   allows: (key: RuleKey) => boolean;
   state: (key: RuleKey) => RuleState;
-  isDemo: (key: RuleKey) => boolean;
   offMessage: (key: RuleKey) => string;
 };
 
@@ -40,7 +39,6 @@ export const getPolicy = cache(async (code: string): Promise<Policy> => {
     retailModel: jur.retailModel,
     allows: (k) => state(k) === "ALLOWED",
     state,
-    isDemo: (k) => !!byKey.get(k)?.isDemo,
     offMessage: (k) => RULES[k].off,
   };
 });

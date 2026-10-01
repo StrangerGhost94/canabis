@@ -4,7 +4,7 @@ A jurisdiction-aware **marketplace** for licensed cannabis retailers in Canada. 
 
 See **BRAND.md** for the brand and design rationale.
 
-> **Demo data.** With `DEMO_MODE=true`, every store, licence (`DEMO-…`), person, partner and order is fictional and labelled as such in the UI. "Simulated" licence checks never consult a real registry. The demo jurisdiction settings (Ontario, BC, Alberta) are **not legal determinations** — they exist only so the product can be explored.
+> **No demo mode.** Cairn runs on real data only: stores, products and partners come from real sign-ups and every licence is checked by a person. Any data left over from the old demo environment is deleted automatically on start.
 
 ## Stack
 Next.js 15 (App Router, server actions) · React 19 · TypeScript · PostgreSQL · Drizzle ORM · Zod · argon2id · hand-written CSS design system (no UI kit) · no client-side analytics or third-party scripts.
@@ -14,15 +14,13 @@ Next.js 15 (App Router, server actions) · React 19 · TypeScript · PostgreSQL 
 cp .env.example .env          # fill in secrets
 npm install
 npm run db:migrate             # applies drizzle/*.sql
-DEMO_MODE=true npm run db:seed # jurisdictions + rules (+ demo data)
+npm run db:seed                # provinces + rules, admin from ADMIN_EMAIL
 npm run dev
 ```
-Demo accounts (password `cairn-demo-2026`): `customer@`, `morgan@`, `retailer@`, `newstore@`, `partner@`, `partner.bc@`, `applicant@`, `admin@` — all `@cairn.demo`. The demo seeds open orders on Larchmont Supply's board.
+Production: `npm run build && npm start` (start runs migrations and the seed, both idempotent). Set a strong `SESSION_SECRET`, `HASH_SALT`, `CRON_SECRET`, `ADMIN_EMAIL`, and schedule `POST /api/cron/licences` daily with header `x-cron-secret`.
 
-Production: `npm run build && npm start`. Set `DEMO_MODE=false`, a strong `SESSION_SECRET`, `HASH_SALT`, `CRON_SECRET`, and schedule `POST /api/cron/licences` daily with header `x-cron-secret`.
-
-## Going live (real mode)
-- Set `DEMO_MODE=false`. On the next deploy, the pre-deploy step (`npm run db:migrate && npm run db:seed`) deletes every demo store, account, order and simulated rule setting. It is idempotent and never touches real data.
+## Going live
+- Remove the old `DEMO_MODE` variable from Railway if it is still set (it is ignored now). On every start, `npm start` runs migrations and the seed, which deletes any leftover demo store, account, order and simulated rule setting. It is idempotent and never touches real data.
 - Set `ADMIN_EMAIL` to your address, then **sign up on the site with that email**. That account becomes the platform administrator; no admin password is stored in settings.
 - In **Admin → Jurisdiction rules**, record a legal basis for each capability you want on (listing, prices, ordering, pickup, delivery, vapes, edibles, partners) per province. Everything stays off until you do.
 - Stores sign up at **List your store**, upload their licence, and appear once you verify them in **Admin → Verification queue**.
@@ -30,14 +28,14 @@ Production: `npm run build && npm start`. Set `DEMO_MODE=false`, a strong `SESSI
 ## Deploy on Railway
 1. Push this repo to GitHub and create a Railway project from it.
 2. Add a **PostgreSQL** service; Railway exposes `DATABASE_URL` — reference it in the app service's variables.
-3. Set variables on the app service: `SESSION_SECRET` (openssl rand -base64 48), `HASH_SALT` (openssl rand -base64 24), `APP_URL` (your Railway URL), `DEMO_MODE` (`true` for the demo, `false` for real use), `CRON_SECRET`, and `UPLOAD_DIR=/data/uploads`.
+3. Set variables on the app service: `SESSION_SECRET` (openssl rand -base64 48), `HASH_SALT` (openssl rand -base64 24), `APP_URL` (your Railway URL), `ADMIN_EMAIL`, `CRON_SECRET`, and `UPLOAD_DIR=/data/uploads`.
 4. Attach a **volume** mounted at `/data` so licence documents and product images survive redeploys.
 5. Deploy. Migrations run automatically on start (`npm start`); `/api/health` is the health check.
-6. Load data once from the service shell: `npm run db:seed` (with `DEMO_MODE=true` for demo data).
+6. Sign up on the site with your `ADMIN_EMAIL` address to become the administrator.
 7. Schedule a daily `POST https://<app>/api/cron/licences` with header `x-cron-secret: $CRON_SECRET` (Railway cron service or any scheduler).
 
 ## What's in it
-**Customers** — province/age gate, storefront home with format shelves, shop grid with filters (format, THC:CBD balance, price where permitted, in stock, open now, distance), store pages with per-location stock, product pages, one-store cart (guest carts carry over on sign-in), live 30 g possession-limit meter, checkout for pickup or delivery with ID confirmation, order tracking with progress and notifications, saved items, settings.
+**Customers** — province/age gate, plain-language guide (`/guide`) and FAQ, location by postal code, city or device, storefront home with format shelves, shop grid with filters (format, THC:CBD balance, price where permitted, in stock, open now, distance), store pages with per-location stock, product pages, one-store cart (guest carts carry over on sign-in), live 30 g possession-limit meter, checkout for pickup or delivery with ID confirmation, order tracking with progress and notifications, saved items, settings.
 
 **Retailers** — onboarding with licence upload, order board (new / preparing / ready to hand over) with accept, decline with reason, ready or out-for-delivery, and completion gated on an ID check; menu and per-location stock, product pack shots, dried-cannabis equivalents, ordering settings (on/off, prep time, delivery fee/minimum/radius), locations and hours, partner requests, purchase reporting API for off-platform sales, licence renewal.
 
@@ -62,7 +60,6 @@ Production: `npm run build && npm start`. Set `DEMO_MODE=false`, a strong `SESSI
 `src/lib/verification/providers.ts` defines the `LicenceVerifier` interface:
 - `MANUAL_REGISTRY_CHECK` — real: a reviewer compares with the regulator's public registry and must record the reference.
 - `EXTERNAL_API` — integration point; throws until a real, contracted source is connected.
-- `DEMO_SIMULATED` — demo only, accepts `DEMO-` numbers, disabled when `DEMO_MODE=false`, always labelled "Simulated".
 
 Listings are filtered at read time (verified retailer + verified, unexpired licence), so a lapsed licence disappears from discovery the day it expires; the daily sweep records the change and notifies the store (30- and 7-day reminders too).
 
@@ -70,4 +67,4 @@ Listings are filtered at read time (verified retailer + verified, unexpired lice
 argon2id passwords · DB-backed sessions (hashed tokens, httpOnly/SameSite cookies, `__Host-` in prod) · RBAC plus tenant checks on every action · Zod validation everywhere · Postgres-backed rate limiting (sign-in, sign-up, reports, API, referral/hand-off routes) · append-only audit log · IPs and visitor ids stored only as keyed hashes · uploads sniffed by magic bytes, size-capped, stored outside the web root and served only to admins/owners · strict security headers and CSP · server-action origin checks (Next.js) · no secrets in client code.
 
 ## Integration points to connect before launch
-Licence registry API · geocoding (`resolvePlace` in `src/lib/geo.ts` is a demo lookup; unknown postcodes are flagged approximate and never show distances) · email/SMS for notifications · partner payouts and tax details · legal review of every jurisdiction rule and the legal-age table.
+Licence registry API · a commercial geocoder at scale (`geocode` in `src/lib/geo.ts` uses OpenStreetMap Nominatim, fine for low volume; customers can also share their device location) · email/SMS for notifications · partner payouts and tax details · legal review of every jurisdiction rule and the legal-age table.

@@ -33,7 +33,7 @@ export default async function PartnerProfile({ params }: { params: Promise<{ han
       <div className="row" style={{ ["--gap" as string]: "18px" }}>
         <span className="pp-avatar" aria-hidden>{initials}</span>
         <div>
-          <div className="row" style={{ ["--gap" as string]: "8px" }}><h1 className="h1">{partner.displayName}</h1>{partner.isDemo && <span className="tag demo">Demo</span>}</div>
+          <div className="row" style={{ ["--gap" as string]: "8px" }}><h1 className="h1">{partner.displayName}</h1></div>
           <p className="small muted">@{partner.handle}, verified Cairn partner in {policy.name}</p>
         </div>
       </div>

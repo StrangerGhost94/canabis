@@ -2,9 +2,10 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { getSession } from "@/lib/auth/session";
 import { getJurisdictions } from "@/lib/compliance";
 import { isProd } from "@/lib/env";
-import { resolvePlace } from "@/lib/geo";
+import { geocode, reverseGeocode } from "@/lib/geo";
 import { AGE_COOKIE, NEAR_COOKIE, REGION_COOKIE } from "@/lib/visitor";
 import { fail, UserFacingError, type ActionState } from "@/lib/actions/result";
 
@@ -29,12 +30,15 @@ export async function confirmRegion(_: ActionState, form: FormData): Promise<Act
 }
 
 export async function setNear(_: ActionState, form: FormData): Promise<ActionState> {
-  const q = String(form.get("near") ?? "").slice(0, 40);
-  const place = resolvePlace(q);
+  const q = String(form.get("near") ?? "").slice(0, 80);
+  const lat = Number(form.get("lat")), lng = Number(form.get("lng"));
+  const fromDevice = Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lat > 41 && lat < 84 && lng > -142 && lng < -52;
+  const place = fromDevice ? await reverseGeocode(lat, lng) : await geocode(q);
   const jar = await cookies();
-  if (!place) return { error: "We couldn't find that area. Try a postal code like M6J 1G3, or a city name." };
-  if (place.jur !== jar.get(REGION_COOKIE)?.value) {
-    return { error: "That area is in a different province. Change your province first." };
+  if (!place) return { error: "We couldn't find that place. Try a full postal code, like M5S 1A1, or a city." };
+  const region = (await getSession())?.user.jurisdictionCode ?? jar.get(REGION_COOKIE)?.value;
+  if (place.jur && place.jur !== region) {
+    return { error: "That's in a different province. Change your province first, then set your location." };
   }
   jar.set(NEAR_COOKIE, place.key, opts);
   redirect(String(form.get("next") || "/shop"));

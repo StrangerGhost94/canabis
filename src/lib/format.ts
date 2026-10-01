@@ -42,3 +42,17 @@ export const relTime = (d: Date | string) => {
 };
 
 export const n = (x: number) => new Intl.NumberFormat("en-CA").format(x);
+
+/** Plain-language, factual one-liners for each format. No effect or lifestyle claims. */
+export const CATEGORY_BLURB: Record<string, string> = {
+  FLOWER: "The dried bud. Ground, then rolled or vaporized.",
+  PRE_ROLL: "Ready-rolled joints, single or in packs.",
+  VAPE: "Cartridges and disposable vape pens.",
+  EXTRACT: "Concentrates such as hash, resin and oils.",
+  EDIBLE: "Chocolates, gummies and baked goods. Max 10 mg THC per pack.",
+  BEVERAGE: "Drinks with a measured amount of THC or CBD.",
+  TOPICAL: "Creams and balms applied to the skin.",
+  CAPSULE: "Measured amounts in capsule or softgel form.",
+  SEED: "Seeds for growing at home, where permitted.",
+  ACCESSORY: "Papers, grinders and other accessories.",
+};

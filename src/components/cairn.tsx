@@ -39,7 +39,7 @@ export function TrustRecord({ trust, retailerName, regulator, registryUrl }: {
       <ol className="list ruled" aria-label="Verification record">
         {[...trust.stones].map((s) => (
           <li key={s.key} className="row top" style={{ padding: "12px 0", ["--gap" as string]: "12px" }}>
-            <span className={`status ${s.ok ? (trust.state === "simulated" && s.key !== "listing" ? "warn" : "ok") : trust.state === "expired" && s.key === "current" ? "bad" : "idle"}`} aria-hidden />
+            <span className={`status ${s.ok ? "ok" : trust.state === "expired" && s.key === "current" ? "bad" : "idle"}`} aria-hidden />
             <div className="grow">
               <p className="strong small">{s.label}</p>
               <p className="small muted">{s.detail}</p>

@@ -43,98 +43,148 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     where: and(ilike(schema.products.name, p.name), ilike(schema.products.brand, p.brand), eq(schema.products.size, p.size), ne(schema.products.id, p.id), eq(schema.products.status, "ACTIVE"), inArray(schema.products.retailerId, listed.map((x) => x.id).concat("_"))),
     with: { retailer: true, inventory: true },
   });
-  const offers = [
-    { id: p.id, retailer: r, priceCents: p.priceCents, inStock: locs.some((l) => l.stock !== "OUT"), current: true, locationId: best?.id },
-    ...others.map((o) => {
-      const lr = listed.find((x) => x.id === o.retailerId)!;
-      const stocked = lr.locations.filter((l) => o.inventory.some((i) => i.locationId === l.id && i.status !== "OUT"));
-      return { id: o.id, retailer: lr, priceCents: o.priceCents, inStock: stocked.length > 0, current: false, locationId: stocked[0]?.id };
-    }),
-  ].sort((a, b) => Number(b.inStock) - Number(a.inStock) || a.priceCents - b.priceCents);
+  type Offer = { id: string; retailer: typeof r; priceCents: number; current: boolean; stocked: typeof locs; nearest: (typeof locs)[number] | undefined };
+  const toOffer = (o: { id: string; priceCents: number; retailerId: string; inventory: { locationId: string; status: string }[] }, current: boolean): Offer => {
+    const lr = listed.find((x) => x.id === o.retailerId)!;
+    const ls = lr.locations.map((l) => ({ ...l, stock: (o.inventory.find((i) => i.locationId === l.id)?.status ?? "OUT") as keyof typeof STOCK, d: v.near && !l.geoApproximate ? km(v.near, l) : null }));
+    const stocked = ls.filter((l) => l.stock !== "OUT").sort((a, b) => (a.d ?? 0) - (b.d ?? 0));
+    return { id: o.id, retailer: lr, priceCents: o.priceCents, current, stocked, nearest: stocked[0] };
+  };
+  const canBuy = (o: Offer) => !!o.nearest && !orderBlock(policy, o.retailer);
+  // In stock first, then stores you can order from, then cheapest.
+  const offers = [toOffer(p, true), ...others.map((o) => toOffer(o, false))]
+    .sort((a, b) => Number(!!b.nearest) - Number(!!a.nearest) || Number(canBuy(b)) - Number(canBuy(a)) || a.priceCents - b.priceCents);
+  const inStock = offers.filter((o) => o.nearest);
+  const low = inStock.length ? Math.min(...inStock.map((o) => o.priceCents)) : null;
+  const lead = inStock[0];
+  const leadBlock = lead ? (v.region && v.region !== lead.retailer.jurisdictionCode ? block : orderBlock(policy, lead.retailer)) : null;
+  const ordering = policy.allows("orders.online");
+  const brandHref = `/brands/${p.brand.toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/[\s_]+/g, "-")}`;
 
   return (
     <div className="wrap product">
-      <p className="small mb-3"><Link href={`/shop?category=${p.category}`}>{CATEGORY_LABEL[p.category]}</Link> at <Link href={`/stores/${r.slug}`}>{r.tradeName}</Link></p>
+      <nav className="crumbs small mb-3" aria-label="Breadcrumb"><Link href="/shop">Shop</Link><span>/</span><Link href={`/shop?category=${p.category}`}>{CATEGORY_LABEL[p.category]}</Link><span>/</span><span aria-current="page">{p.name}</span></nav>
       <div className="product-grid">
         <div className="pd-shelf" style={{ background: `var(--t-${p.category})` }}><PackArt p={p} size={420} /></div>
-        <div className="stack" style={{ ["--gap" as string]: "18px" }}>
+        <div className="stack" style={{ ["--gap" as string]: "22px" }}>
           <div className="row between top" style={{ flexWrap: "nowrap" }}>
             <div>
-              <Link href={`/brands/${p.brand.toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/[\s_]+/g, "-")}`} className="pcard-brand">{p.brand}</Link>
-              <h1 className="h1" style={{ fontSize: "clamp(2.4rem, 4.5vw, 3.6rem)" }}>{p.name}</h1>
-              <p className="muted">{p.size}</p>
+              <Link href={brandHref} className="pcard-brand">{p.brand}</Link>
+              <h1 className="h1" style={{ fontSize: "clamp(2.4rem, 4.5vw, 3.6rem)", marginTop: 4 }}>{p.name}</h1>
+              <p className="muted mt-1">{CATEGORY_LABEL[p.category]} · {p.size}</p>
             </div>
             <SaveButton kind="product" id={p.id} saved={saved} back={`/products/${p.id}`} label={p.name} />
           </div>
-          <div className="row" style={{ ["--gap" as string]: "16px", alignItems: "baseline" }}>
-            {showPrices ? <p className="num" style={{ fontSize: "1.75rem", fontWeight: 600 }}>{money(p.priceCents)}</p> : <p className="muted">{policy.offMessage("retail.prices")}</p>}
-            {best ? <span className={`status ${STOCK[best.stock][0]}`}>{STOCK[best.stock][1]}{locs.length > 1 ? ` at ${best.name}` : ""}</span> : <span className="status idle">Out of stock</span>}
-          </div>
-          <dl className="facts">
-            <div><dt>THC</dt><dd className="num">{pot.thc ?? "Not listed"}</dd></div>
-            <div><dt>CBD</dt><dd className="num">{pot.cbd ?? "Not listed"}</dd></div>
-            <div><dt>Format</dt><dd>{CATEGORY_LABEL[p.category]}</dd></div>
-            <div><dt>Counts toward 30 g limit</dt><dd className="num">{p.equivalentGrams} g</dd></div>
-          </dl>
-          {best ? <AddToCart variant="full" productId={p.id} name={p.name} disabled={block} locationId={best.id} /> : <p className="small muted">Not available to order right now.</p>}
-          {p.description && <p className="prose">{p.description}</p>}
-          <p className="xs muted">Values as published by the store from the product label. Check the package for exact values.</p>
 
-          <div className="sold-by">
-            <div className="row between"><p className="small muted">Sold by</p>{r.isDemo && <span className="tag demo">Demo</span>}</div>
-            <p className="strong">{r.legalName}</p>
-            <TrustButton title="Licence record" trigger={<><CairnMark trust={r.trust} size={16} label={false} /><span>Licensed store</span><span className="more">View licence</span></>}>
-              <TrustRecord trust={r.trust} retailerName={r.legalName} regulator={policy.regulator} registryUrl={policy.registryUrl} />
-            </TrustButton>
-            <div className="table-wrap"><table className="mt-1"><tbody>
-              {locs.map((l) => {
-                const o = openState(l.hours, l.jurisdictionCode);
+          <div className="pd-price">
+            {showPrices && low != null
+              ? <p><span className="num pd-amt">{money(low)}</span>{offers.length > 1 && <span className="muted"> lowest of {inStock.length} {inStock.length === 1 ? "store" : "stores"} in stock</span>}</p>
+              : showPrices ? <p className="muted">Out of stock everywhere right now.</p> : <p className="muted">{policy.offMessage("retail.prices")}</p>}
+          </div>
+
+          <dl className="facts">
+            <div><dt>THC <span className="hint-i">intoxicating</span></dt><dd className="num">{pot.thc ?? "Not listed"}</dd></div>
+            <div><dt>CBD <span className="hint-i">non-intoxicating</span></dt><dd className="num">{pot.cbd ?? "Not listed"}</dd></div>
+            <div><dt>Format</dt><dd>{CATEGORY_LABEL[p.category]}</dd></div>
+            <div><dt>Counts toward your 30 g limit</dt><dd className="num">{p.equivalentGrams} g</dd></div>
+          </dl>
+          <p className="xs muted" style={{ marginTop: 8 }}>From the product label, as published by the store. The package is the final word. <Link href="/guide#labels">How to read a label</Link></p>
+
+          {lead && (
+            <div className="pd-buy">
+              <div className="row between" style={{ alignItems: "flex-start" }}>
+                <div>
+                  <p className="xs muted">{offers.length > 1 ? (lead.priceCents === low ? "Best price" : canBuy(lead) ? "Best price to order online" : "Available at") : "Sold by"}</p>
+                  <p className="strong" style={{ fontSize: "var(--t-md)" }}>{lead.retailer.tradeName}</p>
+                  <p className="small muted">{lead.nearest!.name}, {lead.nearest!.street}{lead.nearest!.d != null ? ` · ${fmtKm(lead.nearest!.d)}` : ""}</p>
+                </div>
+                {showPrices && <p className="num strong" style={{ fontSize: "1.35rem" }}>{money(lead.priceCents)}</p>}
+              </div>
+              <div className="row small" style={{ ["--gap" as string]: "14px" }}>
+                <span className={`status ${STOCK[lead.nearest!.stock][0]}`}>{STOCK[lead.nearest!.stock][1]}</span>
+                <span className={`status ${openState(lead.nearest!.hours, lead.nearest!.jurisdictionCode).open ? "ok" : "idle"}`}>{openState(lead.nearest!.hours, lead.nearest!.jurisdictionCode).label}</span>
+                <span className="seal">Licensed store</span>
+              </div>
+              {leadBlock ? <p className="small muted">{leadBlock}</p> : <AddToCart variant="full" productId={lead.id} name={p.name} locationId={lead.nearest!.id} />}
+              {ordering && !leadBlock && <p className="xs muted">Nothing to pay now. Show your ID and pay {lead.retailer.tradeName} at pickup{policy.allows("retail.delivery") ? " or delivery" : ""}.</p>}
+            </div>
+          )}
+          {!lead && <div className="callout"><p className="strong">Out of stock right now</p><p className="small muted">Save it and check back — stores update their stock throughout the day.</p></div>}
+
+          {p.description && <p className="prose">{p.description}</p>}
+
+          <section id="offers" aria-labelledby="offers-h">
+            <div className="row between mb-2">
+              <h2 id="offers-h" className="h3">{offers.length > 1 ? `Compare ${offers.length} stores` : "Where to get it"}</h2>
+              {!v.near && <Link href="/shop" className="small">Set your location for distances</Link>}
+            </div>
+            <ul className="offers">
+              {offers.map((o) => {
+                const st = o.nearest ? openState(o.nearest.hours, o.nearest.jurisdictionCode) : null;
+                const ob = orderBlock(policy, o.retailer);
+                const pick = policy.allows("retail.pickup") && o.retailer.acceptsOrders && o.stocked.some((l) => l.offersPickup);
+                const del = policy.allows("retail.delivery") && o.retailer.acceptsOrders && o.stocked.some((l) => l.offersDelivery);
                 return (
-                  <tr key={l.id}>
-                    <td><span className="strong">{l.name}</span><br /><span className="muted">{l.street}{l.d != null ? `, ${fmtKm(l.d)}` : ""}</span></td>
-                    <td><span className={`status ${STOCK[l.stock][0]}`}>{STOCK[l.stock][1]}</span></td>
-                    <td className="r"><span className={`status ${o.open ? "ok" : "idle"}`}>{o.label}</span></td>
-                  </tr>
+                  <li key={o.id} className={`offer ${o === lead ? "is-lead" : ""} ${!o.nearest ? "is-out" : ""}`}>
+                    <div className="offer-main">
+                      <p className="row" style={{ ["--gap" as string]: "8px" }}>
+                        <Link href={`/stores/${o.retailer.slug}`} className="offer-name">{o.retailer.tradeName}</Link>
+                        {showPrices && o.nearest && o.priceCents === low && offers.length > 1 && <span className="tag best">Lowest price</span>}
+                      </p>
+                      <p className="xs muted">{o.nearest ? `${o.nearest.name}${o.nearest.d != null ? ` · ${fmtKm(o.nearest.d)}` : ""}${o.stocked.length > 1 ? ` · in stock at ${o.stocked.length} locations` : ""}` : "Out of stock at every location"}</p>
+                      <p className="row xs" style={{ ["--gap" as string]: "6px", marginTop: 6 }}>
+                        {st && <span className={`status ${st.open ? "ok" : "idle"} xs`}>{st.label}</span>}
+                        {pick && <span className="tag">Pickup</span>}
+                        {del && <span className="tag">Delivery</span>}
+                        {ob && <span className="tag">In store only</span>}
+                      </p>
+                    </div>
+                    {showPrices && <span className="num offer-price">{money(o.priceCents)}</span>}
+                    {o.nearest && !ob ? <AddToCart productId={o.id} name={`${p.name} from ${o.retailer.tradeName}`} locationId={o.nearest.id} /> : <span style={{ width: 40 }} />}
+                  </li>
                 );
               })}
-            </tbody></table></div>
-            <p className="xs muted">The store checks government ID and takes payment when you collect or receive your order.</p>
-          </div>
+            </ul>
+          </section>
 
-          {offers.length > 1 && (
-            <section id="offers" aria-labelledby="offers-h">
-              <h2 id="offers-h" className="h3 mb-2">{offers.length} offers from licensed stores</h2>
-              <ul className="list offers">
-                {offers.map((o) => (
-                  <li key={o.id} className={`offer ${o.current ? "is-current" : ""}`}>
-                    <div className="grow">
-                      <Link href={`/stores/${o.retailer.slug}`} className="strong" style={{ color: "var(--ink)" }}>{o.retailer.tradeName}</Link>
-                      <p className="xs muted">{o.retailer.locations.map((l) => l.name).join(", ")}{o.current ? ", this listing" : ""}</p>
-                    </div>
-                    <span className={`status ${o.inStock ? "ok" : "idle"} xs`}>{o.inStock ? "In stock" : "Out of stock"}</span>
-                    {showPrices && <span className="num strong" style={{ minWidth: 72, textAlign: "right" }}>{money(o.priceCents)}</span>}
-                    {o.current ? <span className="xs muted" style={{ width: 40 }} /> : o.inStock ? <AddToCart productId={o.id} name={`${p.name} from ${o.retailer.tradeName}`} disabled={orderBlock(policy, o.retailer)} locationId={o.locationId} /> : <span style={{ width: 40 }} />}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+          <div className="pd-licence">
+            <p className="small muted">Seller of this listing</p>
+            <p className="strong">{r.legalName}</p>
+            <TrustButton title="Licence record" trigger={<><CairnMark trust={r.trust} size={16} label={false} /><span className="seal">Licensed store</span><span className="more">View licence</span></>}>
+              <TrustRecord trust={r.trust} retailerName={r.legalName} regulator={policy.regulator} registryUrl={policy.registryUrl} />
+            </TrustButton>
+          </div>
         </div>
       </div>
       <style>{`
         .product { padding-block: var(--s5) var(--s8); }
+        .crumbs { display: flex; gap: 8px; flex-wrap: wrap; color: var(--ink-2); }
+        .crumbs a { color: var(--ink-2); text-decoration: none; }
+        .crumbs a:hover { color: var(--ink); text-decoration: underline; }
+        .crumbs [aria-current] { color: var(--ink); }
         .product-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s7); align-items: start; }
         .pd-shelf { position: sticky; top: 150px; aspect-ratio: 4 / 5; padding: 14%; }
-        .facts { display: grid; grid-template-columns: 1fr 1fr; margin: 0; background: var(--surface); border-radius: var(--r-panel); overflow: hidden; }
-        .facts div { padding: 12px 16px; border-bottom: 1px solid var(--rule-soft); }
+        .pd-amt { font-size: 2rem; font-weight: 650; margin-right: 8px; }
+        .facts { display: grid; grid-template-columns: 1fr 1fr; margin: 0; background: var(--surface); border: 1px solid var(--rule-soft); overflow: hidden; }
+        .facts div { padding: 14px 18px; border-bottom: 1px solid var(--rule-soft); }
         .facts div:nth-child(odd) { border-right: 1px solid var(--rule-soft); }
         .facts div:nth-last-child(-n+2) { border-bottom: 0; }
         .facts dt { font-size: var(--t-xs); color: var(--ink-2); }
-        .facts dd { margin: 2px 0 0; font-weight: 600; font-size: var(--t-md); }
-        .offers { border-top: 1px solid var(--rule); }
-        .offer { display: flex; align-items: center; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--rule); }
-        .offer.is-current { background: linear-gradient(90deg, var(--surface), transparent); padding-left: 10px; }
-        @media (max-width: 860px) { .product-grid { grid-template-columns: 1fr; gap: var(--s5); } .pd-shelf { position: static; max-width: 420px; } }
+        .facts dd { margin: 2px 0 0; font-weight: 650; font-size: var(--t-lg); }
+        .hint-i { font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--bg); margin-left: 4px; }
+        .pd-buy p + p { margin-top: 2px; }
+        .pd-buy { display: grid; gap: 14px; padding: 22px; border-radius: var(--r-tile); background: var(--surface); border: 1.5px solid var(--ink); box-shadow: var(--shadow-card); }
+        .offers { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+        .offer { display: flex; align-items: center; gap: 16px; padding: 16px 18px; background: var(--surface); border: 1px solid var(--rule-soft); border-radius: var(--r-panel); }
+        .offer.is-lead { border-color: var(--brass); }
+        .offer.is-out { opacity: .6; }
+        .offer-main { flex: 1; min-width: 0; }
+        .offer-name { color: var(--ink); font-weight: 650; text-decoration: none; }
+        .offer-name:hover { text-decoration: underline; }
+        .offer-price { font-weight: 650; min-width: 72px; text-align: right; }
+        .tag.best { background: color-mix(in srgb, var(--pine) 12%, var(--surface)); color: var(--pine); border-color: transparent; }
+        .pd-licence { display: grid; gap: 6px; padding-top: 18px; border-top: 1px solid var(--rule); }
+        @media (max-width: 860px) { .product-grid { grid-template-columns: 1fr; gap: var(--s5); } .pd-shelf { position: static; max-width: 460px; aspect-ratio: 5 / 4; } }
       `}</style>
     </div>
   );

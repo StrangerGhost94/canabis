@@ -21,13 +21,13 @@ export default async function JurisdictionRules({ params }: { params: Promise<{ 
           return (
             <section key={k} id={k} className="panel rule-card">
               <div className="panel-pad">
-                <div className="row" style={{ ["--gap" as string]: "8px" }}><h2 className="h4">{RULES[k].label}</h2>{r?.isDemo && <span className="tag demo">Demo setting</span>}</div>
+                <div className="row" style={{ ["--gap" as string]: "8px" }}><h2 className="h4">{RULES[k].label}</h2></div>
                 <p className="xs muted code" style={{ background: "none", padding: 0 }}>{k}</p>
                 <p className="small muted mt-1">When off, people see: “{RULES[k].off}”</p>
                 {r?.reviewedAt && <p className="xs muted mt-1">Last changed {relTime(r.reviewedAt)}{r.source ? `. Basis: ${r.source}` : ""}</p>}
               </div>
               <div className="panel-pad" style={{ borderLeft: "1px solid var(--rule)" }}>
-                <RuleForm code={j.code} ruleKey={k} status={r?.status ?? "UNCONFIRMED"} source={r?.isDemo ? "" : r?.source ?? ""} notes={r?.notes ?? ""} />
+                <RuleForm code={j.code} ruleKey={k} status={r?.status ?? "UNCONFIRMED"} source={r?.source ?? ""} notes={r?.notes ?? ""} />
               </div>
             </section>
           );

@@ -2,16 +2,15 @@
 import { resolveRisk, reviewLicence, reviewPartner, runLicenceSweep, setPartnerStatus, setRetailerStatus, updateRule } from "@/app/actions/admin";
 import { ActionForm, Field, Input, Submit } from "../form";
 
-export function LicenceReviewForm({ licenceId, demoAllowed, isDemoLicence }: { licenceId: string; demoAllowed: boolean; isDemoLicence: boolean }) {
+export function LicenceReviewForm({ licenceId }: { licenceId: string }) {
   return (
     <ActionForm action={reviewLicence} className="form" >
       {(s) => (
         <>
           <input type="hidden" name="licenceId" value={licenceId} />
           <Field name="method" label="How did you check it?" state={s}>
-            <select id="method" name="method" className="select" defaultValue={s?.values?.method ?? (isDemoLicence && demoAllowed ? "DEMO_SIMULATED" : "MANUAL_REGISTRY_CHECK")}>
+            <select id="method" name="method" className="select" defaultValue={s?.values?.method ?? "MANUAL_REGISTRY_CHECK"}>
               <option value="MANUAL_REGISTRY_CHECK">I compared it with the regulator's public registry</option>
-              {demoAllowed && <option value="DEMO_SIMULATED">Simulated check (demo licences only)</option>}
             </select>
           </Field>
           <Field name="sourceReference" label="Registry reference" hint="URL or record ID of the registry entry you checked. Required to verify manually." state={s}><Input name="sourceReference" state={s} /></Field>

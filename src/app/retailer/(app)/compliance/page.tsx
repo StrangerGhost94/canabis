@@ -32,7 +32,7 @@ export default async function Compliance() {
             {licences.map((l) => (
               <li key={l.id} style={{ padding: "12px 0" }}>
                 <div className="row between"><span className="strong num">{l.number}</span><span className={`status ${LS[l.status]}`}>{l.status[0] + l.status.slice(1).toLowerCase()}</span></div>
-                <p className="small muted">Expires {fmtDate(l.expiresAt)}{l.verifiedAt ? `. Checked ${fmtDate(l.verifiedAt)}` : ""}{l.method === "DEMO_SIMULATED" ? " (simulated)" : ""}</p>
+                <p className="small muted">Expires {fmtDate(l.expiresAt)}{l.verifiedAt ? `. Checked ${fmtDate(l.verifiedAt)}` : ""}</p>
                 {l.reviewNotes && <p className="small">Reviewer note: {l.reviewNotes}</p>}
                 {l.documents.map((d) => <a key={d.id} className="small" href={`/api/documents/${d.id}`} target="_blank" rel="noreferrer">{d.originalName}</a>)}
               </li>
@@ -58,7 +58,7 @@ export default async function Compliance() {
                   <tr key={k}>
                     <td>{RULES[k].label}</td>
                     <td><span className={`status ${s === "ALLOWED" ? "ok" : s === "PROHIBITED" ? "bad" : "idle"}`}>{s === "ALLOWED" ? "On" : s === "PROHIBITED" ? "Off" : "Not yet reviewed"}</span></td>
-                    <td className="muted">{policy.isDemo(k) ? "Demo setting, not a legal determination" : s === "UNCONFIRMED" ? "Off until reviewed" : "Reviewed by Cairn compliance"}</td>
+                    <td className="muted">{s === "UNCONFIRMED" ? "Off until reviewed" : "Reviewed by Cairn compliance"}</td>
                   </tr>
                 );
               })}

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { signOut } from "@/app/actions/auth";
-import { DemoRibbon } from "../demo-ribbon";
 import { ConsoleNav, MobileConsoleNav, type NavGroup } from "./nav";
 
 /** One shell for every workspace, so stores, partners and admins share a vocabulary. */
@@ -30,7 +29,6 @@ export function ConsoleShell({ title, who, groups, children, switcher }: {
   return (
     <>
       <a className="skip" href="#main">Skip to content</a>
-      <DemoRibbon />
       <div className="console">
         <aside className="console-side" aria-label={`${title} navigation`}>{side}</aside>
         <div className="console-mtop">

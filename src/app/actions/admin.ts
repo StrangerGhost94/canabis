@@ -7,9 +7,7 @@ import { fail, ok, UserFacingError, type ActionState } from "@/lib/actions/resul
 import { audit } from "@/lib/audit";
 import { destroyAllSessions, requireRole } from "@/lib/auth/session";
 import { RULE_KEYS } from "@/lib/compliance/rules";
-import { isDemo } from "@/lib/env";
 import { notify } from "@/lib/notify";
-import { demoSimulated } from "@/lib/verification/providers";
 import { sweepLicences } from "@/lib/verification/sweep";
 
 const admin = () => requireRole("ADMIN", "/admin");
@@ -26,7 +24,7 @@ export async function reviewLicence(_: ActionState, form: FormData): Promise<Act
     const d = z.object({
       licenceId: z.string(),
       decision: z.enum(["VERIFIED", "REJECTED"]),
-      method: z.enum(["MANUAL_REGISTRY_CHECK", "DEMO_SIMULATED"]),
+      method: z.enum(["MANUAL_REGISTRY_CHECK"]),
       sourceReference: z.string().trim().max(300).optional(),
       notes: z.string().trim().max(1000).optional(),
     }).parse(Object.fromEntries([...form.entries()].filter(([, v]) => v !== "")));
@@ -35,12 +33,7 @@ export async function reviewLicence(_: ActionState, form: FormData): Promise<Act
 
     let sourceReference = d.sourceReference ?? null;
     if (d.decision === "VERIFIED") {
-      if (d.method === "DEMO_SIMULATED") {
-        if (!isDemo) throw new UserFacingError("Simulated checks are disabled outside demo mode.");
-        const res = await demoSimulated.check({ number: lic.number, holderName: lic.holderName, jurisdictionCode: lic.jurisdictionCode, expiresAt: lic.expiresAt });
-        if (res.outcome !== "match") throw new UserFacingError(res.reason);
-        sourceReference = res.sourceReference;
-      } else if (!sourceReference || sourceReference.length < 8) {
+      if (!sourceReference || sourceReference.length < 8) {
         throw new z.ZodError([{ code: "custom", path: ["sourceReference"], message: "Record where you confirmed it: the registry URL or record ID." }]);
       }
     } else if (!d.notes) {

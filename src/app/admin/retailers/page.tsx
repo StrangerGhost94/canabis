@@ -24,7 +24,7 @@ export default async function Retailers() {
               const t = trustFor(r, r.licences, upd.get(r.id));
               return (
                 <tr key={r.id}>
-                  <td><Link href={`/stores/${r.slug}`} className="strong">{r.tradeName}</Link><br /><span className="muted">{r.legalName}</span>{r.isDemo && <><br /><span className="tag demo">Demo</span></>}</td>
+                  <td><Link href={`/stores/${r.slug}`} className="strong">{r.tradeName}</Link><br /><span className="muted">{r.legalName}</span></td>
                   <td>{r.jurisdictionCode}</td>
                   <td className="num">{t.licence?.number ?? "—"}<br /><span className="muted">{t.licence ? `exp. ${fmtDate(t.licence.expiresAt)}` : ""}</span></td>
                   <td><span className="row" style={{ ["--gap" as string]: "8px", flexWrap: "nowrap" }}><CairnMark trust={t} size={14} label={false} />{t.headline}</span></td>

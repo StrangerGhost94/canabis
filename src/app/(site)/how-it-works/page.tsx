@@ -62,7 +62,7 @@ export default async function HowItWorks() {
                   return (
                     <tr key={k}>
                       <td>{RULES[k].label}</td>
-                      <td><span className={`status ${st === "ALLOWED" ? "ok" : st === "PROHIBITED" ? "bad" : "idle"}`}>{st === "ALLOWED" ? "On" : st === "PROHIBITED" ? "Off, not permitted" : "Off, not yet reviewed"}</span>{st === "ALLOWED" && v.policy!.isDemo(k) && <span className="tag demo" style={{ marginLeft: 8 }}>Demo setting</span>}</td>
+                      <td><span className={`status ${st === "ALLOWED" ? "ok" : st === "PROHIBITED" ? "bad" : "idle"}`}>{st === "ALLOWED" ? "On" : st === "PROHIBITED" ? "Off, not permitted" : "Off, not yet reviewed"}</span></td>
                     </tr>
                   );
                 })}

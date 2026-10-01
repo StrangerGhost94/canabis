@@ -22,7 +22,7 @@ export type VerificationResult =
   | { outcome: "needs_review"; reason: string };
 
 export interface LicenceVerifier {
-  readonly method: "MANUAL_REGISTRY_CHECK" | "EXTERNAL_API" | "DEMO_SIMULATED";
+  readonly method: "MANUAL_REGISTRY_CHECK" | "EXTERNAL_API";
   readonly label: string;
   /** Whether this provider can act without a human reviewer. */
   readonly automatic: boolean;
@@ -48,22 +48,5 @@ export const externalApi: LicenceVerifier = {
     throw new Error(
       "No registry API is connected. Implement ExternalApiProvider with a real, contracted data source.",
     );
-  },
-};
-
-/**
- * Development only. Produces a SIMULATED result so the review flow can be
- * exercised. Records are stored with method DEMO_SIMULATED and are always
- * labelled "Simulated" in every interface. Disabled when DEMO_MODE is off.
- */
-export const demoSimulated: LicenceVerifier = {
-  method: "DEMO_SIMULATED",
-  label: "Simulated check (demo data only)",
-  automatic: true,
-  async check(sub) {
-    if (!sub.number.startsWith("DEMO-")) {
-      return { outcome: "needs_review", reason: "Only DEMO- licence numbers can be simulated." };
-    }
-    return { outcome: "match", sourceReference: `simulated:${sub.number}` };
   },
 };

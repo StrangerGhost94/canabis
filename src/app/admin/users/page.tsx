@@ -22,7 +22,7 @@ export default async function Users({ searchParams }: { searchParams: Promise<{ 
           <tbody>
             {us.map((u) => (
               <tr key={u.id}>
-                <td className="strong">{u.name}{u.isDemo && <span className="tag demo" style={{ marginLeft: 6 }}>Demo</span>}</td>
+                <td className="strong">{u.name}</td>
                 <td>{u.email}</td>
                 <td className="muted">{u.roles.map((r) => r.toLowerCase()).join(", ")}</td>
                 <td>{u.jurisdictionCode}</td>

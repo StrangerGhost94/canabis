@@ -25,5 +25,5 @@ export const getVisitor = cache(async () => {
   const ageOk = !!session || (!!region && jar.get(AGE_COOKIE)?.value === region);
   const nearKey = jar.get(NEAR_COOKIE)?.value;
   const near = nearKey ? resolvePlace(nearKey) : null;
-  return { user: session?.user ?? null, region, policy, ageOk, near: near && near.jur === region ? near : null };
+  return { user: session?.user ?? null, region, policy, ageOk, near: near && (!near.jur || near.jur === region) ? near : null };
 });

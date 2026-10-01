@@ -78,12 +78,11 @@ export default async function StorePage({ params, searchParams }: { params: Prom
         <div className="stack grow" style={{ ["--gap" as string]: "10px", minWidth: 0 }}>
           <div className="row" style={{ ["--gap" as string]: "10px" }}>
             <h1 className="h1">{r.tradeName}</h1>
-            {r.isDemo && <span className="tag demo">Demo listing</span>}
             <SaveButton kind="retailer" id={r.id} saved={saved} back={`/stores/${r.slug}`} label={r.tradeName} />
           </div>
           {r.about && <p className="muted" style={{ maxWidth: "62ch" }}>{r.about}</p>}
           <div className="row" style={{ ["--gap" as string]: "8px" }}>
-            <TrustButton title="Licence record" trigger={<><CairnMark trust={t} size={16} label={false} /><span className="seal">{t.state === "simulated" ? "Licensed store (demo check)" : "Licensed store"}</span><span className="more">View licence</span></>}>{record}</TrustButton>
+            <TrustButton title="Licence record" trigger={<><CairnMark trust={t} size={16} label={false} /><span className="seal">Licensed store</span><span className="more">View licence</span></>}>{record}</TrustButton>
             {o && <span className={`status ${o.open ? "ok" : "idle"}`}>{o.label}</span>}
             {pickup && <span className="tag">Pickup in about {r.pickupLeadMinutes} min</span>}
             {delivery && <span className="tag">Delivery {money(r.deliveryFeeCents)}, {money(r.deliveryMinimumCents)} minimum</span>}

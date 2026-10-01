@@ -15,7 +15,7 @@ export type LicenceLike = {
 export type Stone = { key: "licence" | "current" | "listing"; ok: boolean; label: string; detail: string };
 
 export type Trust = {
-  state: "verified" | "simulated" | "pending" | "expired" | "suspended" | "unlisted";
+  state: "verified" | "pending" | "expired" | "suspended" | "unlisted";
   stones: Stone[];
   headline: string;
   licence: LicenceLike | null;
@@ -43,8 +43,8 @@ export function trustFor(
   lastInventoryUpdate?: Date | null,
 ): Trust {
   const licence = pickLicence(licences);
-  const verified = licence?.status === "VERIFIED";
-  const simulated = verified && licence?.method === "DEMO_SIMULATED";
+  // Legacy simulated checks from the retired demo environment never count as verified.
+  const verified = licence?.status === "VERIFIED" && licence?.method !== "DEMO_SIMULATED";
   const current = !!licence && licence.expiresAt >= today() && licence.status !== "EXPIRED";
   const fresh = !!lastInventoryUpdate && Date.now() - new Date(lastInventoryUpdate).getTime() < 14 * 86400e3;
 
@@ -52,11 +52,9 @@ export function trustFor(
     {
       key: "licence",
       ok: verified,
-      label: verified ? (simulated ? "Licence check simulated" : "Licence checked") : "Licence not yet checked",
+      label: verified ? "Licence checked" : "Licence not yet checked",
       detail: verified
-        ? simulated
-          ? "Demo data. This record was not checked against any real registry."
-          : `Compared with the regulator's public registry on ${fmtDate(licence!.verifiedAt!)}.`
+        ? `Compared with the regulator's public registry on ${fmtDate(licence!.verifiedAt!)}.`
         : "Cairn reviews every licence before a store is listed.",
     },
     {
@@ -79,16 +77,15 @@ export function trustFor(
   if (retailer.status === "SUSPENDED") state = "suspended";
   else if (licence && !current) state = "expired";
   else if (!verified || retailer.status !== "VERIFIED") state = "pending";
-  else state = simulated ? "simulated" : "verified";
+  else state = "verified";
 
   const headline = {
     verified: "Licensed retailer, checked by Cairn",
-    simulated: "Demo listing — licence check simulated",
     pending: "Not yet verified — not listed",
     expired: "Licence expired — listing paused",
     suspended: "Listing suspended",
     unlisted: "Not listed",
   }[state];
 
-  return { state, stones, headline, licence, listed: state === "verified" || state === "simulated" };
+  return { state, stones, headline, licence, listed: state === "verified" };
 }

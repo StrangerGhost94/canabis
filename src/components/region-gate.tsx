@@ -28,9 +28,9 @@ export function RegionGate({ jurisdictions, current, next, dismissible = false, 
             <div className="dialog-body stack" style={{ ["--gap" as string]: "20px" }}>
               <div className="stack" style={{ ["--gap" as string]: "8px" }}>
                 <span className="cairn verified" style={{ ["--cs" as string]: "28px" }} aria-hidden><i className="on" /><i className="on" /><i className="on" /></span>
-                <h2 id="gate-title" className="h2">Where are you?</h2>
+                <h2 id="gate-title" className="h2">Welcome to Cairn</h2>
                 <p className="muted">
-                  Cairn lists licensed cannabis stores for adults in Canada. The rules — including the legal age — depend on your province or territory.
+                  Every licensed cannabis store near you, in one place. Tell us where you shop so we can show the stores, prices and rules — including the legal age — for your province or territory.
                 </p>
               </div>
               <input type="hidden" name="next" value={next} />
@@ -61,7 +61,7 @@ export function RegionGate({ jurisdictions, current, next, dismissible = false, 
   );
 }
 
-export function ChangeRegionButton({ label, className = "region-pill" }: { label: string; className?: string }) {
+export function ChangeRegionButton({ label, className = "region-pill" }: { label: React.ReactNode; className?: string }) {
   return (
     <button type="button" className={className} onClick={() => (document.getElementById("region-gate") as HTMLDialogElement | null)?.showModal()}>
       {label}

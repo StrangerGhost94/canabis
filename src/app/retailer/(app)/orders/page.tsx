@@ -31,7 +31,6 @@ export default async function RetailerOrders() {
       <span className="row xs" style={{ ["--gap" as string]: "6px" }}>
         <span className="tag">{o.fulfilment === "PICKUP" ? `Pickup, ${o.location.name}` : "Delivery"}</span>
         {o.readyBy && o.status === "ACCEPTED" && <span className="tag">Due {fmtTime(o.readyBy, o.jurisdictionCode)}</span>}
-        {o.isDemo && <span className="tag demo">Demo</span>}
       </span>
     </Link>
   );
