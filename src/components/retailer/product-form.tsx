@@ -3,7 +3,7 @@ import { saveProduct } from "@/app/actions/retailer";
 import { CATEGORY_LABEL } from "@/lib/format";
 import { ActionForm, Field, Input, Submit } from "../form";
 
-type P = { id: string; name: string; brand: string; category: string; size: string; potencyUnit: string; thcMin: number | null; thcMax: number | null; cbdMin: number | null; cbdMax: number | null; priceCents: number; description: string | null };
+type P = { id: string; name: string; brand: string; category: string; size: string; potencyUnit: string; thcMin: number | null; thcMax: number | null; cbdMin: number | null; cbdMax: number | null; priceCents: number; description: string | null; equivalentGrams: number; imageKey: string | null };
 
 export function ProductForm({ product, categories }: { product?: P; categories: string[] }) {
   const v = (x: number | null | undefined) => (x == null ? "" : String(x));
@@ -39,8 +39,16 @@ export function ProductForm({ product, categories }: { product?: P; categories: 
               <Field name="cbdMax" label="CBD max" state={s}><Input name="cbdMax" inputMode="decimal" defaultValue={v(product?.cbdMax)} state={s} /></Field>
             </div>
           </fieldset>
-          <Field name="price" label="Price (CAD)" hint="Shown only where provincial rules allow prices to be displayed." state={s}>
-            <Input name="price" inputMode="decimal" defaultValue={product ? (product.priceCents / 100).toFixed(2) : ""} state={s} style={{ maxWidth: 200 }} />
+          <div className="form-row">
+            <Field name="price" label="Price (CAD)" hint="Shown only where provincial rules allow prices." state={s}>
+              <Input name="price" inputMode="decimal" defaultValue={product ? (product.priceCents / 100).toFixed(2) : ""} state={s} />
+            </Field>
+            <Field name="equivalentGrams" label="Dried-cannabis equivalent (g)" hint="As printed on the label. Used for the 30 g limit." state={s}>
+              <Input name="equivalentGrams" inputMode="decimal" defaultValue={product ? String(product.equivalentGrams) : ""} state={s} />
+            </Field>
+          </div>
+          <Field name="image" label="Pack shot (optional)" hint="JPEG or PNG on a plain background, up to 4 MB. Without one, Cairn draws the package." state={s}>
+            <input id="image" name="image" type="file" accept="image/jpeg,image/png" className="input" />
           </Field>
           <Field name="description" label="Description" hint="Factual details only: format, packaging, how it's made. No health claims, effects or lifestyle language." state={s}>
             <textarea id="description" name="description" className="textarea" defaultValue={s?.values?.description ?? product?.description ?? ""} maxLength={600} aria-invalid={s?.fields?.description ? true : undefined} />

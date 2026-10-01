@@ -10,17 +10,18 @@ export default async function RetailerLayout({ children }: { children: React.Rea
   const { user, retailer } = await requireRetailer();
   const licences = await db.query.licences.findMany({ where: eq(schema.licences.retailerId, retailer.id) });
   const trust = trustFor(retailer, licences, (await lastInventoryUpdates([retailer.id])).get(retailer.id));
+  const [{ c: newOrders }] = await db.select({ c: count() }).from(schema.orders).where(and(eq(schema.orders.retailerId, retailer.id), eq(schema.orders.status, "PLACED")));
   const [{ c: requests }] = await db.select({ c: count() }).from(schema.partnerRetailers).where(and(eq(schema.partnerRetailers.retailerId, retailer.id), eq(schema.partnerRetailers.status, "REQUESTED")));
   return (
     <ConsoleShell
       title="Store"
       who={{ name: retailer.tradeName, detail: <span className="row top" style={{ ["--gap" as string]: "8px", flexWrap: "nowrap", marginTop: 4 }}><span style={{ paddingTop: 3 }}><CairnMark trust={trust} size={12} label={false} /></span>{trust.headline}</span> }}
       groups={[
-        { items: [{ href: "/retailer", label: "Overview", exact: true }] },
+        { items: [{ href: "/retailer", label: "Overview", exact: true }, { href: "/retailer/orders", label: "Orders", count: newOrders }] },
         { label: "Your listing", items: [
           { href: "/retailer/products", label: "Menu and stock" },
           { href: "/retailer/locations", label: "Locations and hours" },
-          { href: "/retailer/settings", label: "Store profile" },
+          { href: "/retailer/settings", label: "Ordering and profile" },
         ] },
         { label: "Referrals", items: [
           { href: "/retailer/partners", label: "Partners", count: requests },

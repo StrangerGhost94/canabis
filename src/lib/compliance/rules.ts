@@ -21,20 +21,20 @@ export const RULES = {
     label: "Show prices",
     off: "Price on request at the store",
   },
-  "retail.onlineHandoff": {
-    group: "Retail",
-    label: "Link to the retailer's own online ordering",
-    off: "Online ordering links aren't enabled for this province or territory.",
+  "orders.online": {
+    group: "Orders",
+    label: "Take orders through Cairn for the store to fulfil",
+    off: "Ordering through Cairn isn't available in this province or territory yet. Visit the store to buy.",
   },
   "retail.pickup": {
     group: "Retail",
-    label: "Show in-store pickup availability",
-    off: "Pickup details aren't shown in this province or territory.",
+    label: "Offer in-store pickup orders",
+    off: "Pickup orders aren't available in this province or territory.",
   },
   "retail.delivery": {
     group: "Retail",
-    label: "Show retailer delivery availability",
-    off: "Delivery details aren't shown in this province or territory.",
+    label: "Offer delivery by the store",
+    off: "Delivery isn't available in this province or territory.",
   },
   "promo.discounts": {
     group: "Advertising",

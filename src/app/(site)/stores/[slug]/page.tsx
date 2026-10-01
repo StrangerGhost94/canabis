@@ -3,14 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db, schema } from "@/db";
 import { CairnMark, TrustRecord } from "@/components/cairn";
-import { IconArrowOut, IconPin } from "@/components/icons";
-import { LabelTile } from "@/components/label-tile";
+import { IconPin } from "@/components/icons";
+import { ProductCard } from "@/components/product-card";
 import { SaveButton } from "@/components/save-button";
 import { TrustButton } from "@/components/trust-button";
 import { allowedCategories, getPolicy } from "@/lib/compliance";
 import { CATEGORIES, CATEGORY_LABEL, money } from "@/lib/format";
 import { DAYS, fmtKm, fmtTime, km, openState } from "@/lib/geo";
-import { productsForStore, storeBySlug } from "@/lib/queries";
+import { orderBlock, productsForStore, storeBySlug } from "@/lib/queries";
 import { getVisitor } from "@/lib/visitor";
 import { fmtDate } from "@/lib/verification/trust";
 
@@ -19,162 +19,142 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return { title: r?.tradeName ?? "Store" };
 }
 
-const STOCK = { IN_STOCK: ["ok", "In stock"], LOW: ["warn", "Low"], OUT: ["idle", "Out"] } as const;
-
-export default async function StorePage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function StorePage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ loc?: string; category?: string }> }) {
   const { slug } = await params;
+  const sp = await searchParams;
   const r = await storeBySlug(slug);
   if (!r) notFound();
   const v = await getVisitor();
   const policy = await getPolicy(r.jurisdictionCode);
-  const elsewhere = v.region && v.region !== r.jurisdictionCode;
   const t = r.trust;
-
-  const record = (
-    <TrustRecord trust={t} retailerName={r.legalName} regulator={policy.regulator} registryUrl={policy.registryUrl} />
-  );
+  const record = <TrustRecord trust={t} retailerName={r.legalName} regulator={policy.regulator} registryUrl={policy.registryUrl} />;
 
   if (!t.listed) {
     return (
       <div className="wrap section stack" style={{ maxWidth: 720 }}>
-        <p className="small"><Link href="/discover">Discover</Link></p>
+        <p className="small"><Link href="/stores">Stores</Link></p>
         <h1 className="h1">{r.tradeName}</h1>
         <div className={`callout ${t.state === "expired" || t.state === "suspended" ? "bad" : "warn"}`}>
           <p className="strong">{t.headline}</p>
           <p className="small muted">
-            {t.state === "expired" && `This store's licence expired on ${fmtDate(t.licence!.expiresAt)}. Its listing is paused until a renewed licence is reviewed. Cairn won't link to its ordering page in the meantime.`}
-            {t.state === "suspended" && "Cairn has suspended this listing after a review. It won't appear in search, and Cairn doesn't link to its ordering page."}
+            {t.state === "expired" && `This store's licence expired on ${fmtDate(t.licence!.expiresAt)}. Its listing and ordering are paused until a renewed licence is reviewed.`}
+            {t.state === "suspended" && "Cairn has suspended this listing after a review. It isn't taking orders on Cairn."}
             {t.state === "pending" && "This store hasn't completed Cairn's licence review, so it isn't listed yet."}
           </p>
         </div>
         <div className="panel panel-pad">{record}</div>
-        <Link href="/discover" className="btn">Find a listed store</Link>
+        <Link href="/stores" className="btn">Find a listed store</Link>
       </div>
     );
   }
 
+  const elsewhere = v.region && v.region !== r.jurisdictionCode;
+  const block = elsewhere ? `This store is in ${policy.name}. You can only order from stores in your own province.` : orderBlock(policy, r);
+  const loc = r.locations.find((l) => l.id === sp.loc) ?? [...r.locations].sort((a, b) => (v.near ? km(v.near, a) - km(v.near, b) : 0))[0];
   const cats = allowedCategories(policy, CATEGORIES);
-  const showProducts = policy.allows("retail.products");
-  const products = showProducts ? await productsForStore(r.id, cats) : [];
+  const all = policy.allows("retail.products") ? await productsForStore(r.id, cats) : [];
+  const present = cats.filter((c) => all.some((p) => p.category === c));
+  const products = sp.category ? all.filter((p) => p.category === sp.category) : all;
   const showPrices = policy.allows("retail.prices");
-  const canOrder = !!r.orderingUrl && policy.allows("retail.onlineHandoff") && !elsewhere;
-  const savedStore = v.user ? !!(await db.query.favourites.findFirst({ where: and(eq(schema.favourites.userId, v.user.id), eq(schema.favourites.retailerId, r.id)) })) : false;
-  const grouped = cats.map((c) => ({ c, items: products.filter((p) => p.category === c) })).filter((g) => g.items.length);
-  const locById = new Map(r.locations.map((l) => [l.id, l]));
+  const saved = v.user ? !!(await db.query.favourites.findFirst({ where: and(eq(schema.favourites.userId, v.user.id), eq(schema.favourites.retailerId, r.id)) })) : false;
+  const o = loc ? openState(loc.hours, loc.jurisdictionCode) : null;
+  const pickup = !block && policy.allows("retail.pickup") && loc?.offersPickup;
+  const delivery = !block && policy.allows("retail.delivery") && loc?.offersDelivery;
   const today = new Date().getDay();
+  const qs = (patch: Record<string, string | undefined>) => {
+    const q = new URLSearchParams(Object.entries({ loc: sp.loc, category: sp.category, ...patch }).filter(([, x]) => x) as [string, string][]);
+    return `/stores/${r.slug}${q.size ? `?${q}` : ""}`;
+  };
 
   return (
     <div className="wrap store">
-      <header className="store-head">
-        <div className="stack" style={{ ["--gap" as string]: "14px" }}>
-          <p className="small"><Link href="/discover?view=stores">Stores in {policy.name}</Link></p>
-          <div className="row" style={{ ["--gap" as string]: "12px" }}>
+      <header className="store-hero">
+        <span className="scard-mark big" aria-hidden>{r.tradeName.slice(0, 1)}</span>
+        <div className="stack grow" style={{ ["--gap" as string]: "10px", minWidth: 0 }}>
+          <div className="row" style={{ ["--gap" as string]: "10px" }}>
             <h1 className="h1">{r.tradeName}</h1>
             {r.isDemo && <span className="tag demo">Demo listing</span>}
+            <SaveButton kind="retailer" id={r.id} saved={saved} back={`/stores/${r.slug}`} label={r.tradeName} />
           </div>
-          {r.about && <p className="lede">{r.about}</p>}
-          <div className="row">
-            <TrustButton title="Verification record" trigger={<><CairnMark trust={t} size={20} label={false} /><span>{t.headline}</span><span className="more">View record</span></>}>
-              {record}
-            </TrustButton>
-            <SaveButton kind="retailer" id={r.id} saved={savedStore} back={`/stores/${r.slug}`} label={r.tradeName} />
+          {r.about && <p className="muted" style={{ maxWidth: "62ch" }}>{r.about}</p>}
+          <div className="row" style={{ ["--gap" as string]: "8px" }}>
+            <TrustButton title="Licence record" trigger={<><CairnMark trust={t} size={16} label={false} /><span>{t.state === "simulated" ? "Licensed store (demo check)" : "Licensed store"}</span><span className="more">View licence</span></>}>{record}</TrustButton>
+            {o && <span className={`status ${o.open ? "ok" : "idle"}`}>{o.label}</span>}
+            {pickup && <span className="tag">Pickup in about {r.pickupLeadMinutes} min</span>}
+            {delivery && <span className="tag">Delivery {money(r.deliveryFeeCents)}, {money(r.deliveryMinimumCents)} minimum</span>}
+            {block && <span className="tag">In store only</span>}
           </div>
         </div>
-        <aside className="sold-by" aria-label="Who you buy from">
-          <p className="small muted">You buy from</p>
-          <p className="h4">{r.legalName}</p>
-          <p className="small muted tabular">Licence {t.licence?.number}, {policy.regulator}</p>
-          <p className="small mt-1">The store makes the sale, checks ID and issues your receipt. Cairn doesn't take orders or payment.</p>
-          {elsewhere ? (
-            <p className="small callout warn mt-1">This store is in {policy.name}. You've set {v.policy?.name} as your province.</p>
-          ) : canOrder ? (
-            <a className="btn signal mt-1" href={`/go/${r.id}`} rel="nofollow">Order on {r.tradeName}'s site <IconArrowOut width={18} /></a>
-          ) : (
-            <p className="small muted mt-1">{r.orderingUrl ? policy.offMessage("retail.onlineHandoff") : "This store sells in person only."}</p>
-          )}
-        </aside>
       </header>
 
-      <section aria-labelledby="locs" className="section-sm">
-        <h2 id="locs" className="h3 mb-2">{r.locations.length === 1 ? "Location" : `${r.locations.length} locations`}</h2>
-        <div className="locs">
-          {r.locations.map((l) => {
-            const o = openState(l.hours, l.jurisdictionCode);
-            return (
-              <div key={l.id} className="panel panel-pad stack" style={{ ["--gap" as string]: "10px" }}>
-                <div className="row between top">
-                  <div>
-                    <p className="h4">{l.name}</p>
-                    <p className="small">{l.street}, {l.city} {l.postalCode}</p>
-                  </div>
-                  {v.near && !l.geoApproximate && <span className="small muted num">{fmtKm(km(v.near, l))}</span>}
-                </div>
-                <span className={`status ${o.open ? "ok" : "idle"}`}>{o.label}</span>
-                <table className="hours num" aria-label={`Hours for ${l.name}`}>
-                  <tbody>
-                    {[1, 2, 3, 4, 5, 6, 0].map((d) => {
-                      const h = l.hours.find((x) => x.d === d);
-                      return <tr key={d} className={d === today ? "today" : ""}><td>{DAYS[d].slice(0, 3)}</td><td>{h ? `${fmtTime(h.open)} – ${fmtTime(h.close)}` : "Closed"}</td></tr>;
-                    })}
-                  </tbody>
-                </table>
-                <div className="row small" style={{ ["--gap" as string]: "12px" }}>
-                  {policy.allows("retail.pickup") && l.offersPickup && <span className="tag">Pickup</span>}
-                  {policy.allows("retail.delivery") && l.offersDelivery && <span className="tag">Delivery by the store</span>}
-                  <a href={`https://www.openstreetmap.org/?mlat=${l.lat}&mlon=${l.lng}#map=17/${l.lat}/${l.lng}`} target="_blank" rel="noreferrer" className="row" style={{ ["--gap" as string]: "4px" }}><IconPin width={16} />Map</a>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      <section aria-labelledby="menu" className="section-sm">
-        <div className="row between mb-2">
-          <h2 id="menu" className="h3">What they carry</h2>
-          <span className={t.stones[2].ok ? "small muted" : "status warn"}>{t.stones[2].ok ? t.stones[2].detail : "Availability may be out of date"}</span>
-        </div>
-        {!showProducts ? (
-          <p className="callout small">{policy.offMessage("retail.products")}</p>
-        ) : grouped.length === 0 ? (
-          <p className="muted">This store hasn't published its menu yet.</p>
-        ) : (
-          grouped.map((g) => (
-            <div key={g.c} className="menu-group">
-              <h3 className="h4">{CATEGORY_LABEL[g.c]} <span className="muted small">{g.items.length}</span></h3>
-              <ul className="list ruled">
-                {g.items.map((p) => (
-                  <li key={p.id}>
-                    <Link href={`/products/${p.id}`} className="list-link menu-row">
-                      <LabelTile p={p} />
-                      <span className="grow">
-                        <span className="strong">{p.name}</span>
-                        <span className="small muted"> {p.brand}, {p.size}</span>
-                        <span className="row small mt-1" style={{ ["--gap" as string]: "12px" }}>
-                          {p.inventory.map((i) => {
-                            const [c, label] = STOCK[i.status];
-                            return <span key={i.locationId} className={`status ${c}`}>{r.locations.length > 1 ? `${locById.get(i.locationId)?.name}: ` : ""}{label}</span>;
-                          })}
-                        </span>
-                      </span>
-                      <span className="strong num">{showPrices ? money(p.priceCents) : ""}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+      <div className="store-layout">
+        <section aria-labelledby="menu">
+          <div className="row between mb-2">
+            <h2 id="menu" className="h3">{block ? "On the shelf" : "Order from this store"}</h2>
+            <span className="xs muted">{t.stones[2].ok ? t.stones[2].detail : "Availability may be out of date"}</span>
+          </div>
+          {block && <p className="callout small mb-3">{block}</p>}
+          {present.length > 1 && (
+            <nav className="seg mb-3" aria-label="Formats">
+              <Link href={qs({ category: undefined })} className={`chip ${!sp.category ? "on" : ""}`}>All</Link>
+              {present.map((c) => <Link key={c} href={qs({ category: c })} className={`chip ${sp.category === c ? "on" : ""}`}>{CATEGORY_LABEL[c]}</Link>)}
+            </nav>
+          )}
+          {!policy.allows("retail.products") ? <p className="callout small">{policy.offMessage("retail.products")}</p> : products.length === 0 ? <p className="muted">No products published yet.</p> : (
+            <div className="pgrid">
+              {products.map((p) => (
+                <ProductCard key={p.id} p={p} store={{ name: r.tradeName, slug: r.slug }} showStore={false} showPrice={showPrices}
+                  orderable={block} stock={p.inventory.find((i) => i.locationId === loc?.id)?.status ?? "OUT"} />
+              ))}
             </div>
-          ))
-        )}
-      </section>
+          )}
+        </section>
+
+        <aside className="store-side stack" style={{ ["--gap" as string]: "16px" }}>
+          {r.locations.length > 1 && (
+            <nav className="panel panel-pad stack" style={{ ["--gap" as string]: "8px" }} aria-label="Locations">
+              <p className="small strong">Showing stock at</p>
+              {r.locations.map((l) => (
+                <Link key={l.id} href={qs({ loc: l.id })} className={`loc-opt ${l.id === loc?.id ? "on" : ""}`} aria-current={l.id === loc?.id ? "true" : undefined}>
+                  <span className="strong">{l.name}</span>
+                  <span className="xs muted">{l.street}{v.near && !l.geoApproximate ? `, ${fmtKm(km(v.near, l))}` : ""}</span>
+                </Link>
+              ))}
+            </nav>
+          )}
+          {loc && (
+            <div className="panel panel-pad stack" style={{ ["--gap" as string]: "10px" }}>
+              <p className="h4">{loc.name}</p>
+              <p className="small">{loc.street}, {loc.city} {loc.postalCode}</p>
+              <table className="hours num" aria-label={`Hours for ${loc.name}`}>
+                <tbody>
+                  {[1, 2, 3, 4, 5, 6, 0].map((d) => {
+                    const h = loc.hours.find((x) => x.d === d);
+                    return <tr key={d} className={d === today ? "today" : ""}><td>{DAYS[d].slice(0, 3)}</td><td>{h ? `${fmtTime(h.open)} – ${fmtTime(h.close)}` : "Closed"}</td></tr>;
+                  })}
+                </tbody>
+              </table>
+              <a className="small row" style={{ ["--gap" as string]: "4px" }} href={`https://www.openstreetmap.org/?mlat=${loc.lat}&mlon=${loc.lng}#map=17/${loc.lat}/${loc.lng}`} target="_blank" rel="noreferrer"><IconPin width={16} />Open in map</a>
+            </div>
+          )}
+          <div className="sold-by">
+            <p className="small muted">You buy from</p>
+            <p className="strong">{r.legalName}</p>
+            <p className="xs muted tabular">Licence {t.licence?.number}, {policy.regulator}</p>
+            <p className="small mt-1">The store prepares your order, checks government ID and takes payment at handover. Cairn never takes payment.</p>
+          </div>
+        </aside>
+      </div>
       <style>{`
-        .store { padding-block: var(--s6) var(--s8); }
-        .store-head { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--s7); align-items: start; padding-bottom: var(--s6); border-bottom: 1px solid var(--rule); }
-        .section-sm { padding-top: var(--s6); }
-        .locs { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--s4); }
-        .menu-group + .menu-group { margin-top: var(--s5); }
-        .menu-group h3 { margin-bottom: var(--s2); }
-        .menu-row { display: flex; gap: 16px; align-items: center; padding: 12px 4px; }
-        @media (max-width: 860px) { .store-head { grid-template-columns: 1fr; gap: var(--s5); } }
+        .store { padding-block: var(--s5) var(--s8); }
+        .store-hero { display: flex; gap: 20px; align-items: flex-start; padding: 24px; background: var(--surface); border-radius: var(--r-panel); margin-bottom: var(--s6); }
+        .scard-mark.big { width: 76px; height: 76px; font-size: 2.2rem; border-radius: 20px; }
+        .store-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--s6); align-items: start; }
+        .store-side { position: sticky; top: 130px; }
+        .loc-opt { display: grid; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--rule); color: var(--ink); text-decoration: none; }
+        .loc-opt.on { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+        @media (max-width: 960px) { .store-layout { grid-template-columns: 1fr; } .store-side { position: static; } }
+        @media (max-width: 600px) { .store-hero { flex-direction: column; padding: 18px; } .scard-mark.big { width: 56px; height: 56px; font-size: 1.6rem; } }
       `}</style>
     </div>
   );

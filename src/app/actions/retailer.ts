@@ -13,7 +13,7 @@ import { screenCopy } from "@/lib/compliance/copy-check";
 import { randomToken, sha256, shortCode } from "@/lib/crypto";
 import { resolvePlace } from "@/lib/geo";
 import { notify } from "@/lib/notify";
-import { storeDocument } from "@/lib/uploads";
+import { storeDocument, storeMedia } from "@/lib/uploads";
 import { adminIds } from "@/lib/verification/sweep";
 
 const CENTROIDS: Record<string, [number, number]> = {
@@ -103,11 +103,12 @@ const ProductInput = z.object({
   cbdMin: z.coerce.number().min(0).max(1000).optional(),
   cbdMax: z.coerce.number().min(0).max(1000).optional(),
   price: z.coerce.number({ invalid_type_error: "Enter a price." }).positive("Enter a price.").max(10000),
+  equivalentGrams: z.coerce.number({ invalid_type_error: "Enter the dried-cannabis equivalent from the label." }).min(0).max(30, "A single package can't exceed the 30 g limit."),
   description: z.string().trim().max(600).optional(),
 });
 
 function parseProduct(form: FormData) {
-  const raw = Object.fromEntries([...form.entries()].map(([k, v]) => [k, v === "" ? undefined : v]));
+  const raw = Object.fromEntries([...form.entries()].filter(([, v]) => typeof v === "string").map(([k, v]) => [k, v === "" ? undefined : v]));
   const d = ProductInput.parse(raw);
   const issue = screenCopy(`${d.name} ${d.description ?? ""}`);
   if (issue) throw new z.ZodError([{ code: "custom", path: ["description"], message: issue }]);
@@ -118,7 +119,7 @@ function parseProduct(form: FormData) {
   return {
     name: d.name, brand: d.brand, category: d.category, size: d.size, potencyUnit: d.potencyUnit,
     thcMin: d.thcMin ?? null, thcMax: d.thcMax ?? d.thcMin ?? null, cbdMin: d.cbdMin ?? null, cbdMax: d.cbdMax ?? d.cbdMin ?? null,
-    priceCents: Math.round(d.price * 100), description: d.description || null,
+    priceCents: Math.round(d.price * 100), description: d.description || null, equivalentGrams: d.equivalentGrams,
   };
 }
 
@@ -126,7 +127,9 @@ export async function saveProduct(_: ActionState, form: FormData): Promise<Actio
   let dest: string | null = null;
   try {
     const { user, retailer } = await requireRetailer();
-    const values = parseProduct(form);
+    const values: ReturnType<typeof parseProduct> & { imageKey?: string } = parseProduct(form);
+    const image = form.get("image");
+    if (image instanceof File && image.size > 0) values.imageKey = await storeMedia(image);
     const id = String(form.get("id") ?? "");
     if (id) {
       await assertOwnsProduct(retailer.id, id);
@@ -322,4 +325,47 @@ export async function revokeApiKey(form: FormData) {
   await db.update(schema.retailerApiKeys).set({ revokedAt: new Date() }).where(and(eq(schema.retailerApiKeys.id, id), eq(schema.retailerApiKeys.retailerId, retailer.id), isNull(schema.retailerApiKeys.revokedAt)));
   await audit({ actorId: user.id, action: "api_key.revoke", targetType: "retailer", targetId: retailer.id, metadata: { id } });
   revalidatePath("/retailer/referrals");
+}
+
+// ─── Orders ─────────────────────────────────────────────────────────────────
+
+export async function orderAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const { user, retailer } = await requireRetailer();
+    const d = z.object({
+      orderId: z.string(),
+      to: z.enum(["ACCEPTED", "REJECTED", "READY", "OUT_FOR_DELIVERY", "COMPLETED", "CANCELLED"]),
+      note: z.string().trim().max(300).optional(),
+      readyMinutes: z.coerce.number().int().min(5).max(480).optional(),
+      idChecked: z.string().optional(),
+    }).parse(Object.fromEntries([...form.entries()].filter(([, v]) => v !== "")));
+    const { transitionOrder } = await import("@/lib/orders");
+    await transitionOrder(d.orderId, d.to, { id: user.id, as: "store", retailerId: retailer.id }, { note: d.note, readyMinutes: d.readyMinutes, idChecked: d.idChecked === "yes" });
+    revalidatePath("/retailer", "layout");
+    return ok({ ACCEPTED: "Accepted. The customer has been told.", REJECTED: "Declined. The customer has been told why.", READY: "Marked ready. The customer has been told to come in.", OUT_FOR_DELIVERY: "Marked out for delivery.", COMPLETED: "Order complete.", CANCELLED: "Order cancelled." }[d.to]);
+  } catch (e) {
+    return fail(e, form);
+  }
+}
+
+export async function saveOrderingSettings(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const { user, retailer } = await requireRetailerOwner();
+    const d = z.object({
+      acceptsOrders: z.string().optional(),
+      pickupLeadMinutes: z.coerce.number().int().min(5, "At least 5 minutes.").max(480),
+      deliveryFee: z.coerce.number().min(0).max(100),
+      deliveryMinimum: z.coerce.number().min(0).max(1000),
+      deliveryRadiusKm: z.coerce.number().int().min(1).max(100),
+    }).parse(Object.fromEntries(form));
+    await db.update(schema.retailers).set({
+      acceptsOrders: d.acceptsOrders === "on", pickupLeadMinutes: d.pickupLeadMinutes,
+      deliveryFeeCents: Math.round(d.deliveryFee * 100), deliveryMinimumCents: Math.round(d.deliveryMinimum * 100), deliveryRadiusKm: d.deliveryRadiusKm,
+    }).where(eq(schema.retailers.id, retailer.id));
+    await audit({ actorId: user.id, action: "retailer.update_ordering", targetType: "retailer", targetId: retailer.id, metadata: d });
+    revalidatePath("/retailer", "layout");
+    return ok(d.acceptsOrders === "on" ? "Saved. You're taking orders on Cairn." : "Saved. Ordering is paused; customers can still see your menu.");
+  } catch (e) {
+    return fail(e, form);
+  }
 }

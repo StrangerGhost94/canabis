@@ -57,3 +57,22 @@ export async function readDocument(storageKey: string) {
   if (!full.startsWith(root + path.sep)) throw new UploadError("Invalid path.");
   return readFile(full);
 }
+
+/** Public product images. Stored privately on disk, served through /media/[key]. */
+export async function storeMedia(file: File) {
+  if (!file || file.size === 0) throw new UploadError("Choose an image.");
+  if (file.size > 4 * 1024 * 1024) throw new UploadError("Images must be 4 MB or smaller.");
+  const buf = Buffer.from(await file.arrayBuffer());
+  const kind = sniff(buf);
+  if (!kind || kind.mime === "application/pdf") throw new UploadError("Upload a JPEG or PNG image.");
+  const key = `${randomToken(16)}.${kind.ext}`;
+  const full = path.resolve(env.UPLOAD_DIR, "media", key);
+  await mkdir(path.dirname(full), { recursive: true });
+  await writeFile(full, buf, { mode: 0o600 });
+  return key;
+}
+
+export async function readMedia(key: string) {
+  if (!/^[\w-]+\.(jpg|png)$/.test(key)) throw new UploadError("Invalid image.");
+  return { buf: await readFile(path.resolve(env.UPLOAD_DIR, "media", key)), mime: key.endsWith(".png") ? "image/png" : "image/jpeg" };
+}

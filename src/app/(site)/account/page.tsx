@@ -26,6 +26,7 @@ export default async function Account({ searchParams }: { searchParams: Promise<
         <p className="muted">{u.email}, {policy.name}</p>
       </div>
       <dl className="metrics">
+        <div className="metric"><dt>Orders</dt><dd><Link href="/orders">View</Link></dd><p className="delta">Track and review your orders</p></div>
         <div className="metric"><dt>Saved</dt><dd>{saved}</dd><p className="delta"><Link href="/account/saved">View saved</Link></p></div>
         <div className="metric"><dt>Legal age in {policy.name}</dt><dd>{policy.legalAge}+</dd><p className="delta">Confirmed from your date of birth</p></div>
       </dl>

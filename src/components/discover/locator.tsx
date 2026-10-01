@@ -33,7 +33,7 @@ export function Locator({ near, points }: {
           const { x, y } = project(p);
           return (
             <a key={p.id} href={p.href} aria-label={p.label}>
-              <rect x={x - 7} y={y - 5} width={14} height={10} rx={5} fill={p.open ? "var(--accent)" : "var(--surface)"} stroke="var(--ink)" strokeWidth={1.5} />
+              <circle cx={x} cy={y} r={7} fill={p.open ? "var(--sun)" : "var(--surface)"} stroke="var(--ink)" strokeWidth={2} />
               <title>{p.label}</title>
             </a>
           );
@@ -41,7 +41,7 @@ export function Locator({ near, points }: {
       </svg>
       <figcaption className="legend mt-1">
         <span style={{ ["--c" as string]: "var(--ink)" }}>{near.label}</span>
-        <span style={{ ["--c" as string]: "var(--accent)" }}>Open now</span>
+        <span style={{ ["--c" as string]: "var(--sun)" }}>Open now</span>
         <span style={{ ["--c" as string]: "var(--stone)" }}>Closed</span>
       </figcaption>
     </figure>

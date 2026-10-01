@@ -20,3 +20,6 @@ export const IconFilter = (p: SVGProps<SVGSVGElement>) => (<svg {...base(p)}><pa
 export const IconCopy = (p: SVGProps<SVGSVGElement>) => (<svg {...base(p)}><rect x="8.5" y="8.5" width="11" height="11" rx="1.5" /><path d="M15.5 8.5V6A1.5 1.5 0 0 0 14 4.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5" /></svg>);
 export const IconLocate = (p: SVGProps<SVGSVGElement>) => (<svg {...base(p)}><circle cx="12" cy="12" r="3" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" /><circle cx="12" cy="12" r="7" /></svg>);
 export const IconShield = (p: SVGProps<SVGSVGElement>) => (<svg {...base(p)}><path d="M12 3.5 5 6v5.5c0 4.4 3 7.6 7 9 4-1.4 7-4.6 7-9V6Z" /></svg>);
+export const IconBag = (p: SVGProps<SVGSVGElement>) => (<svg {...base(p)}><path d="M5.5 8h13l-1 12h-11Z" /><path d="M9 8V6.5a3 3 0 0 1 6 0V8" /></svg>);
+export const IconReceipt = (p: SVGProps<SVGSVGElement>) => (<svg {...base(p)}><path d="M6 3.5h12v17l-2.5-1.5-2 1.5-1.5-1.2-1.5 1.2-2-1.5L6 20.5Z" /><path d="M9 8.5h6M9 12h6" /></svg>);
+export const IconHome = (p: SVGProps<SVGSVGElement>) => (<svg {...base(p)}><path d="M4 10.5 12 4l8 6.5V20h-5.5v-5.5h-5V20H4Z" /></svg>);

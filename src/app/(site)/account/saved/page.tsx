@@ -25,7 +25,7 @@ export default async function Saved() {
         <span className="cairn" aria-hidden><i /><i /><i /></span>
         <p className="h4">Nothing saved yet</p>
         <p className="muted small">Tap the heart on a store or product to keep it here. If a saved store's licence lapses, you'll see it flagged.</p>
-        <Link href="/discover" className="btn primary sm">Discover stores</Link>
+        <Link href="/shop" className="btn primary sm">Start shopping</Link>
       </div>
     );
   }

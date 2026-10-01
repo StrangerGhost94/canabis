@@ -13,7 +13,7 @@ export function ConsoleShell({ title, who, groups, children, switcher }: {
 }) {
   const side = (
     <>
-      <Link href="/" className="brand"><span className="cairn" aria-hidden><i /><i /><i /></span>Cairn <span className="small muted" style={{ fontWeight: 500, fontStretch: "100%" }}>{title}</span></Link>
+      <Link href="/" className="brand"><span className="cairn" aria-hidden><i /><i /><i /></span>cairn <span className="small muted" style={{ fontWeight: 500, fontStretch: "100%" }}>{title}</span></Link>
       <div className="console-who">
         <p className="strong small ellipsis">{who.name}</p>
         <div className="xs muted">{who.detail}</div>

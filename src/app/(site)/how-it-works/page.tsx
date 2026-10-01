@@ -42,7 +42,7 @@ export default async function HowItWorks() {
 
       <div className="stack prose mt-5" style={{ ["--gap" as string]: "16px" }}>
         <h2 className="h2">Who sells, and who doesn't</h2>
-        <p>Cairn never sells, stores, reserves or delivers cannabis, and never takes payment. When you choose a product, you buy it from the licensed store, in person or through the store's own ordering page. The store is responsible for the sale, for checking your ID, and for following provincial rules.</p>
+        <p>Cairn is where you shop and place orders, but the licensed store is always the seller. When you order, the store accepts it, prepares it, checks your government ID and takes payment at the counter or your door. Cairn never holds product or takes payment. Every order comes from one store and stays within the 30 g public-possession limit.</p>
         <p>Partners are people who recommend stores. Each one applies, agrees to a code of conduct (no sales, no handling product, no marketing to anyone under the legal age, no health claims), and is reviewed before their links work. If a partner breaks those terms, their links stop attributing and their profile comes down.</p>
 
         <h2 className="h2">Watching for problems</h2>

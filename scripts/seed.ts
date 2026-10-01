@@ -47,7 +47,7 @@ const DEMO_RULES: Record<string, Partial<Record<RuleKey, "ALLOWED" | "PROHIBITED
   ON: Object.fromEntries(RULE_KEYS.map((k) => [k, "ALLOWED"])) as Record<RuleKey, "ALLOWED">,
   BC: {
     "retail.directory": "ALLOWED", "retail.products": "ALLOWED", "retail.prices": "ALLOWED",
-    "retail.onlineHandoff": "ALLOWED", "retail.pickup": "ALLOWED", "product.vapes": "ALLOWED",
+    "orders.online": "ALLOWED", "retail.pickup": "ALLOWED", "product.vapes": "ALLOWED",
     "product.edibles": "ALLOWED", "partner.referrals": "ALLOWED", "partner.profiles": "ALLOWED",
     // compensation left UNCONFIRMED to demonstrate the fail-closed state
   },
@@ -158,7 +158,7 @@ async function main() {
       ],
     },
     {
-      slug: "coastal-registry", tradeName: "Coastal Registry", legalName: "Coastal Registry Retail Inc. (demo)", jur: "BC", status: "VERIFIED",
+      slug: "coastal-registry", tradeName: "Coastal Registry", legalName: "Coastal Registry Retail Inc. (demo)", jur: "BC", status: "VERIFIED", ordering: true,
       about: "Downtown store near the stadium district.",
       licence: { status: "VERIFIED", expires: days(500) },
       locations: [{ name: "Gastown", street: "301 Water St", city: "Vancouver", postal: "V6B 1B8", lat: 49.2846, lng: -123.1088, hours: H("10:00", "22:00"), pickup: true }],
@@ -179,23 +179,23 @@ async function main() {
 
   // ── Fictional brands & products ──
   const BRANDS = ["Paperbirch", "Shale & Co.", "Low Tide", "Granite Hollow", "Muskeg", "Fieldwork", "Northcourt", "Spruce Line"];
-  type P = { name: string; category: typeof s.categoryEnum.enumValues[number]; size: string; unit: "%" | "mg"; thc: [number, number] | null; cbd: [number, number] | null; price: number; desc: string };
+  type P = { name: string; category: typeof s.categoryEnum.enumValues[number]; size: string; unit: "%" | "mg"; thc: [number, number] | null; cbd: [number, number] | null; price: number; desc: string; grams: number };
   const CATALOGUE: P[] = [
-    { name: "Shoreline", category: "FLOWER", size: "3.5 g", unit: "%", thc: [19, 23], cbd: [0, 0.5], price: 3299, desc: "Whole flower, hang-dried, hand-trimmed. Packaged on date shown on label." },
-    { name: "Overcast", category: "FLOWER", size: "7 g", unit: "%", thc: [14, 17], cbd: [0, 1], price: 4999, desc: "Whole flower in a resealable glass jar." },
-    { name: "Even Keel", category: "FLOWER", size: "3.5 g", unit: "%", thc: [6, 9], cbd: [8, 11], price: 3499, desc: "Balanced THC and CBD flower." },
-    { name: "Lantern", category: "PRE_ROLL", size: "3 × 0.5 g", unit: "%", thc: [20, 24], cbd: [0, 0.5], price: 2299, desc: "Pre-rolls with unbleached papers and paper tips." },
-    { name: "Dockside", category: "PRE_ROLL", size: "10 × 0.35 g", unit: "%", thc: [17, 21], cbd: [0, 0.5], price: 3899, desc: "Smaller-format pre-rolls in a tin." },
-    { name: "Long Exposure", category: "VAPE", size: "1 g cartridge", unit: "%", thc: [82, 88], cbd: [0, 1], price: 5499, desc: "510-thread cartridge. Battery sold separately." },
-    { name: "Still Water", category: "VAPE", size: "0.5 g all-in-one", unit: "%", thc: [70, 76], cbd: [0, 2], price: 3999, desc: "Disposable all-in-one device." },
-    { name: "Two Lakes", category: "EDIBLE", size: "5 × 2 mg", unit: "mg", thc: [10, 10], cbd: [0, 0], price: 699, desc: "Soft chews, 2 mg THC each. 10 mg per package." },
-    { name: "Half Light", category: "EDIBLE", size: "2 × 5 mg", unit: "mg", thc: [10, 10], cbd: [20, 20], price: 899, desc: "Dark chocolate, 5 mg THC and 10 mg CBD per square." },
-    { name: "Ripple", category: "BEVERAGE", size: "355 mL", unit: "mg", thc: [5, 5], cbd: [0, 0], price: 649, desc: "Sparkling beverage, 5 mg THC per can." },
-    { name: "Clear Sound", category: "BEVERAGE", size: "355 mL", unit: "mg", thc: [2, 2], cbd: [10, 10], price: 599, desc: "Sparkling beverage, 2 mg THC and 10 mg CBD." },
-    { name: "Bedrock", category: "EXTRACT", size: "1 g", unit: "%", thc: [65, 72], cbd: [0, 1], price: 4499, desc: "Pressed hash." },
-    { name: "Cold Front", category: "TOPICAL", size: "50 mL", unit: "mg", thc: [0, 0], cbd: [500, 500], price: 4299, desc: "Topical lotion. For external use only." },
-    { name: "Measure", category: "CAPSULE", size: "30 × 10 mg", unit: "mg", thc: [0, 0], cbd: [300, 300], price: 3999, desc: "Softgel capsules, 10 mg CBD each." },
-    { name: "Pilot", category: "SEED", size: "5 seeds", unit: "%", thc: null, cbd: null, price: 4999, desc: "Feminized seeds for personal cultivation where permitted." },
+    { name: "Shoreline", category: "FLOWER", size: "3.5 g", unit: "%", thc: [19, 23], cbd: [0, 0.5], price: 3299, desc: "Whole flower, hang-dried, hand-trimmed. Packaged on date shown on label.", grams: 3.5 },
+    { name: "Overcast", category: "FLOWER", size: "7 g", unit: "%", thc: [14, 17], cbd: [0, 1], price: 4999, desc: "Whole flower in a resealable glass jar.", grams: 7 },
+    { name: "Even Keel", category: "FLOWER", size: "3.5 g", unit: "%", thc: [6, 9], cbd: [8, 11], price: 3499, desc: "Balanced THC and CBD flower.", grams: 3.5 },
+    { name: "Lantern", category: "PRE_ROLL", size: "3 × 0.5 g", unit: "%", thc: [20, 24], cbd: [0, 0.5], price: 2299, desc: "Pre-rolls with unbleached papers and paper tips.", grams: 1.5 },
+    { name: "Dockside", category: "PRE_ROLL", size: "10 × 0.35 g", unit: "%", thc: [17, 21], cbd: [0, 0.5], price: 3899, desc: "Smaller-format pre-rolls in a tin.", grams: 3.5 },
+    { name: "Long Exposure", category: "VAPE", size: "1 g cartridge", unit: "%", thc: [82, 88], cbd: [0, 1], price: 5499, desc: "510-thread cartridge. Battery sold separately.", grams: 4 },
+    { name: "Still Water", category: "VAPE", size: "0.5 g all-in-one", unit: "%", thc: [70, 76], cbd: [0, 2], price: 3999, desc: "Disposable all-in-one device.", grams: 2 },
+    { name: "Two Lakes", category: "EDIBLE", size: "5 × 2 mg", unit: "mg", thc: [10, 10], cbd: [0, 0], price: 699, desc: "Soft chews, 2 mg THC each. 10 mg per package.", grams: 1.7 },
+    { name: "Half Light", category: "EDIBLE", size: "2 × 5 mg", unit: "mg", thc: [10, 10], cbd: [20, 20], price: 899, desc: "Dark chocolate, 5 mg THC and 10 mg CBD per square.", grams: 1.3 },
+    { name: "Ripple", category: "BEVERAGE", size: "355 mL", unit: "mg", thc: [5, 5], cbd: [0, 0], price: 649, desc: "Sparkling beverage, 5 mg THC per can.", grams: 5.1 },
+    { name: "Clear Sound", category: "BEVERAGE", size: "355 mL", unit: "mg", thc: [2, 2], cbd: [10, 10], price: 599, desc: "Sparkling beverage, 2 mg THC and 10 mg CBD.", grams: 5.1 },
+    { name: "Bedrock", category: "EXTRACT", size: "1 g", unit: "%", thc: [65, 72], cbd: [0, 1], price: 4499, desc: "Pressed hash.", grams: 4 },
+    { name: "Cold Front", category: "TOPICAL", size: "50 mL", unit: "mg", thc: [0, 0], cbd: [500, 500], price: 4299, desc: "Topical lotion. For external use only.", grams: 3.3 },
+    { name: "Measure", category: "CAPSULE", size: "30 × 10 mg", unit: "mg", thc: [0, 0], cbd: [300, 300], price: 3999, desc: "Softgel capsules, 10 mg CBD each.", grams: 2.5 },
+    { name: "Pilot", category: "SEED", size: "5 seeds", unit: "%", thc: null, cbd: null, price: 4999, desc: "Feminized seeds for personal cultivation where permitted.", grams: 5 },
   ];
 
   const partnerIds: Record<string, string> = {};
@@ -223,7 +223,7 @@ async function main() {
   for (const st of stores) {
     const [r] = await db.insert(s.retailers).values({
       slug: st.slug, tradeName: st.tradeName, legalName: st.legalName, jurisdictionCode: st.jur, status: st.status,
-      about: st.about, website: `https://${st.slug}.example`, orderingUrl: st.ordering ? `https://${st.slug}.example/order` : null, isDemo: true,
+      about: st.about, website: `https://${st.slug}.example`, acceptsOrders: !!st.ordering, pickupLeadMinutes: 30, deliveryFeeCents: 699, deliveryMinimumCents: 4000, isDemo: true,
     }).returning();
     if (st.slug === "larchmont-supply") await db.insert(s.retailerMembers).values({ userId: owner.id, retailerId: r.id, role: "OWNER" });
 
@@ -249,7 +249,7 @@ async function main() {
       const [prod] = await db.insert(s.products).values({
         retailerId: r.id, name: p.name, brand, category: p.category, size: p.size, potencyUnit: p.unit,
         thcMin: p.thc?.[0] ?? null, thcMax: p.thc?.[1] ?? null, cbdMin: p.cbd?.[0] ?? null, cbdMax: p.cbd?.[1] ?? null,
-        priceCents: p.price + drift, description: p.desc, isDemo: true,
+        priceCents: p.price + drift, description: p.desc, equivalentGrams: p.grams, isDemo: true,
       }).returning();
       for (const [li, loc] of locs.entries()) {
         const roll = (i * 5 + li * 3 + si) % 9;
@@ -304,6 +304,35 @@ async function main() {
   }
   for (let i = 0; i < events.length; i += 500) await db.insert(s.referralEvents).values(events.slice(i, i + 500));
   await db.insert(s.conversions).values(convs);
+
+  // ── Demo orders (fictional; no payment is ever taken by Cairn) ──
+  const morgan = await mkUser("morgan@cairn.demo", "Morgan Ellis", ["CUSTOMER"], "ON", "1987-11-03");
+  const demoOrder = async (o: { user: typeof customer; slug: string; fulfil: "PICKUP" | "DELIVERY"; status: (typeof s.orderStatus.enumValues)[number]; ago: number; pick: number[]; partner?: boolean }) => {
+    const r = R[o.slug];
+    const loc = (await db.query.locations.findMany({ where: (l, { eq }) => eq(l.retailerId, r.id), orderBy: (l, { asc }) => asc(l.createdAt) }))[o.fulfil === "DELIVERY" ? 1 : 0] ?? (await db.query.locations.findFirst({ where: (l, { eq }) => eq(l.retailerId, r.id) }))!;
+    const prods = (await db.query.products.findMany({ where: (p, { eq }) => eq(p.retailerId, r.id), orderBy: (p, { asc }) => asc(p.name) })).filter((_, i) => o.pick.includes(i));
+    const sub = prods.reduce((a, p) => a + p.priceCents, 0);
+    const fee = o.fulfil === "DELIVERY" ? r.deliveryFeeCents : 0;
+    const at = new Date(Date.now() - o.ago * 60e3);
+    const camp = o.partner ? camps.find((c) => c.retailerId === r.id) : undefined;
+    const [ord] = await db.insert(s.orders).values({
+      number: `C-DEMO${Math.floor(o.ago % 997).toString().padStart(3, "0")}${o.pick.length}`, userId: o.user.id, retailerId: r.id, locationId: loc.id, fulfilment: o.fulfil, status: o.status,
+      subtotalCents: sub, deliveryFeeCents: fee, totalCents: sub + fee, equivalentGrams: prods.reduce((a, p) => a + p.equivalentGrams, 0),
+      contactName: o.user.name, contactPhone: "555-0142 (demo)", jurisdictionCode: r.jurisdictionCode,
+      deliveryAddress: o.fulfil === "DELIVERY" ? { street: "14 Larchmount Ave", city: "Toronto", postalCode: "M4M 2Y6" } : null,
+      readyBy: o.status === "PLACED" ? null : new Date(at.getTime() + 30 * 60e3), idChecked: o.status === "COMPLETED",
+      partnerId: camp?.partnerId ?? null, campaignId: camp?.id ?? null, isDemo: true, createdAt: at, updatedAt: at,
+    }).returning();
+    await db.insert(s.orderItems).values(prods.map((p) => ({ orderId: ord.id, productId: p.id, name: p.name, brand: p.brand, category: p.category, size: p.size, unitPriceCents: p.priceCents, quantity: 1, equivalentGrams: p.equivalentGrams })));
+    const flow = ({ PLACED: ["PLACED"], ACCEPTED: ["PLACED", "ACCEPTED"], READY: ["PLACED", "ACCEPTED", "READY"], OUT_FOR_DELIVERY: ["PLACED", "ACCEPTED", "OUT_FOR_DELIVERY"], COMPLETED: o.fulfil === "PICKUP" ? ["PLACED", "ACCEPTED", "READY", "COMPLETED"] : ["PLACED", "ACCEPTED", "OUT_FOR_DELIVERY", "COMPLETED"], CANCELLED: ["PLACED", "CANCELLED"], REJECTED: ["PLACED", "REJECTED"] } as Record<string, (typeof s.orderStatus.enumValues)[number][]>)[o.status];
+    await db.insert(s.orderEvents).values(flow.map((st, i) => ({ orderId: ord.id, status: st, actorId: i === 0 ? o.user.id : owner.id, createdAt: new Date(at.getTime() + i * 12 * 60e3) })));
+  };
+  await demoOrder({ user: customer, slug: "larchmont-supply", fulfil: "PICKUP", status: "ACCEPTED", ago: 18, pick: [0, 4] });
+  await demoOrder({ user: morgan, slug: "larchmont-supply", fulfil: "PICKUP", status: "PLACED", ago: 4, pick: [1, 2, 6] });
+  await demoOrder({ user: morgan, slug: "larchmont-supply", fulfil: "DELIVERY", status: "PLACED", ago: 9, pick: [3, 5, 8], partner: true });
+  await demoOrder({ user: customer, slug: "larchmont-supply", fulfil: "PICKUP", status: "READY", ago: 55, pick: [7] });
+  await demoOrder({ user: customer, slug: "harbourline", fulfil: "DELIVERY", status: "COMPLETED", ago: 60 * 24 * 6, pick: [2, 3], partner: true });
+  await demoOrder({ user: morgan, slug: "larchmont-supply", fulfil: "PICKUP", status: "COMPLETED", ago: 60 * 26, pick: [0, 1] });
 
   // ── Review queue, risk and notifications ──
   await db.insert(s.riskFlags).values([

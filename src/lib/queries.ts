@@ -165,3 +165,10 @@ export async function productsForStore(retailerId: string, categories: string[])
   });
 }
 
+
+/** Why this store's products can't go in a cart here, or null if they can. */
+export function orderBlock(policy: { allows: (k: "orders.online") => boolean; name: string }, r: { acceptsOrders: boolean; tradeName: string }) {
+  if (!policy.allows("orders.online")) return `Ordering through Cairn isn't available in ${policy.name} yet.`;
+  if (!r.acceptsOrders) return `${r.tradeName} sells in store only.`;
+  return null;
+}

@@ -49,6 +49,16 @@ export const conversionStatus = pgEnum("conversion_status", ["REPORTED", "CONFIR
 export const commissionStatus = pgEnum("commission_status", [
   "NOT_APPLICABLE", "PENDING", "APPROVED", "WITHHELD", "PAID",
 ]);
+export const fulfilmentEnum = pgEnum("fulfilment", ["PICKUP", "DELIVERY"]);
+export const orderStatus = pgEnum("order_status", [
+  "PLACED", // waiting on the store
+  "ACCEPTED", // store is preparing it
+  "READY", // ready for pickup
+  "OUT_FOR_DELIVERY",
+  "COMPLETED", // handed over after an ID check
+  "CANCELLED", // by the customer, before acceptance
+  "REJECTED", // by the store
+]);
 export const riskSeverity = pgEnum("risk_severity", ["LOW", "MEDIUM", "HIGH"]);
 export const riskStatus = pgEnum("risk_status", ["OPEN", "DISMISSED", "ACTIONED"]);
 
@@ -117,7 +127,12 @@ export const retailers = pgTable("retailers", {
   status: retailerStatus("status").notNull().default("DRAFT"),
   about: text("about"),
   website: text("website"),
-  orderingUrl: text("ordering_url"), // the retailer's own licensed ordering page
+  orderingUrl: text("ordering_url"), // legacy: retailer's own ordering page (unused by the marketplace)
+  acceptsOrders: boolean("accepts_orders").notNull().default(false),
+  pickupLeadMinutes: integer("pickup_lead_minutes").notNull().default(30),
+  deliveryFeeCents: integer("delivery_fee_cents").notNull().default(0),
+  deliveryMinimumCents: integer("delivery_minimum_cents").notNull().default(0),
+  deliveryRadiusKm: integer("delivery_radius_km").notNull().default(8),
   isDemo: boolean("is_demo").notNull().default(false),
   createdAt: created(),
   updatedAt: updated(),
@@ -199,6 +214,9 @@ export const products = pgTable("products", {
   cbdMax: doublePrecision("cbd_max"),
   priceCents: integer("price_cents").notNull(),
   description: text("description"), // factual only
+  imageKey: text("image_key"), // optional pack shot uploaded by the store
+  /** Grams of dried cannabis this package counts as under the federal 30 g public-possession limit. */
+  equivalentGrams: doublePrecision("equivalent_grams").notNull().default(0),
   status: productStatus("status").notNull().default("ACTIVE"),
   isDemo: boolean("is_demo").notNull().default(false),
   createdAt: created(),
@@ -222,6 +240,79 @@ export const favourites = pgTable("favourites", {
   uniqueIndex("fav_user_retailer").on(t.userId, t.retailerId),
   uniqueIndex("fav_user_product").on(t.userId, t.productId),
 ]);
+
+// ─── Carts & orders ─────────────────────────────────────────────────────────
+
+/** One cart per browser (cookie) or user, holding items from a single store. */
+export const carts = pgTable("carts", {
+  id: id(),
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+  retailerId: text("retailer_id").references(() => retailers.id, { onDelete: "set null" }),
+  locationId: text("location_id").references(() => locations.id, { onDelete: "set null" }),
+  createdAt: created(),
+  updatedAt: updated(),
+}, (t) => [index("cart_user").on(t.userId)]);
+
+export const cartItems = pgTable("cart_items", {
+  cartId: text("cart_id").notNull().references(() => carts.id, { onDelete: "cascade" }),
+  productId: text("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  quantity: integer("quantity").notNull(),
+  addedAt: created(),
+}, (t) => [primaryKey({ columns: [t.cartId, t.productId] })]);
+
+/**
+ * An order request to a licensed store. The store is the seller: it accepts
+ * the order, checks ID, takes payment and hands over the product. Cairn never
+ * takes payment.
+ */
+export const orders = pgTable("orders", {
+  id: id(),
+  number: text("number").notNull().unique(), // short human reference, e.g. C-7K2M9
+  userId: text("user_id").notNull().references(() => users.id),
+  retailerId: text("retailer_id").notNull().references(() => retailers.id),
+  locationId: text("location_id").notNull().references(() => locations.id),
+  fulfilment: fulfilmentEnum("fulfilment").notNull(),
+  status: orderStatus("status").notNull().default("PLACED"),
+  subtotalCents: integer("subtotal_cents").notNull(),
+  deliveryFeeCents: integer("delivery_fee_cents").notNull().default(0),
+  totalCents: integer("total_cents").notNull(),
+  equivalentGrams: doublePrecision("equivalent_grams").notNull(),
+  contactName: text("contact_name").notNull(),
+  contactPhone: text("contact_phone").notNull(),
+  deliveryAddress: jsonb("delivery_address").$type<{ street: string; unit?: string; city: string; postalCode: string } | null>(),
+  notes: text("notes"),
+  readyBy: ts("ready_by"),
+  cancelReason: text("cancel_reason"),
+  idChecked: boolean("id_checked").notNull().default(false),
+  partnerId: text("partner_id").references(() => partners.id, { onDelete: "set null" }),
+  campaignId: text("campaign_id").references(() => campaigns.id, { onDelete: "set null" }),
+  jurisdictionCode: text("jurisdiction_code").notNull(),
+  isDemo: boolean("is_demo").notNull().default(false),
+  createdAt: created(),
+  updatedAt: updated(),
+}, (t) => [index("order_user").on(t.userId, t.createdAt), index("order_retailer").on(t.retailerId, t.status)]);
+
+export const orderItems = pgTable("order_items", {
+  id: id(),
+  orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  productId: text("product_id").references(() => products.id, { onDelete: "set null" }),
+  name: text("name").notNull(),
+  brand: text("brand").notNull(),
+  category: categoryEnum("category").notNull(),
+  size: text("size").notNull(),
+  unitPriceCents: integer("unit_price_cents").notNull(),
+  quantity: integer("quantity").notNull(),
+  equivalentGrams: doublePrecision("equivalent_grams").notNull(),
+});
+
+export const orderEvents = pgTable("order_events", {
+  id: id(),
+  orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  status: orderStatus("status").notNull(),
+  actorId: text("actor_id").references(() => users.id, { onDelete: "set null" }),
+  note: text("note"),
+  createdAt: created(),
+}, (t) => [index("order_event_order").on(t.orderId)]);
 
 // ─── Partners & referrals ───────────────────────────────────────────────────
 
@@ -426,6 +517,31 @@ export const conversionRelations = relations(conversions, ({ one }) => ({
   retailer: one(retailers, { fields: [conversions.retailerId], references: [retailers.id] }),
   partner: one(partners, { fields: [conversions.partnerId], references: [partners.id] }),
   campaign: one(campaigns, { fields: [conversions.campaignId], references: [campaigns.id] }),
+}));
+export const cartRelations = relations(carts, ({ one, many }) => ({
+  items: many(cartItems),
+  retailer: one(retailers, { fields: [carts.retailerId], references: [retailers.id] }),
+  location: one(locations, { fields: [carts.locationId], references: [locations.id] }),
+}));
+export const cartItemRelations = relations(cartItems, ({ one }) => ({
+  cart: one(carts, { fields: [cartItems.cartId], references: [carts.id] }),
+  product: one(products, { fields: [cartItems.productId], references: [products.id] }),
+}));
+export const orderRelations = relations(orders, ({ one, many }) => ({
+  items: many(orderItems),
+  events: many(orderEvents),
+  user: one(users, { fields: [orders.userId], references: [users.id] }),
+  retailer: one(retailers, { fields: [orders.retailerId], references: [retailers.id] }),
+  location: one(locations, { fields: [orders.locationId], references: [locations.id] }),
+  partner: one(partners, { fields: [orders.partnerId], references: [partners.id] }),
+}));
+export const orderItemRelations = relations(orderItems, ({ one }) => ({
+  order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
+  product: one(products, { fields: [orderItems.productId], references: [products.id] }),
+}));
+export const orderEventRelations = relations(orderEvents, ({ one }) => ({
+  order: one(orders, { fields: [orderEvents.orderId], references: [orders.id] }),
+  actor: one(users, { fields: [orderEvents.actorId], references: [users.id] }),
 }));
 export const auditRelations = relations(auditLogs, ({ one }) => ({
   actor: one(users, { fields: [auditLogs.actorId], references: [users.id] }),

@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { createApiKey, createStore, reportConversion, saveLocation, saveStoreProfile, submitLicence } from "@/app/actions/retailer";
+import { createApiKey, createStore, reportConversion, saveLocation, saveOrderingSettings, saveStoreProfile, submitLicence } from "@/app/actions/retailer";
 import { DAYS } from "@/lib/geo";
 import { ActionForm, Field, Input, Submit } from "../form";
 import { IconCopy } from "../icons";
@@ -49,7 +49,7 @@ export function LocationForm({ loc, pickupAllowed, deliveryAllowed }: { loc?: Lo
   );
 }
 
-export function StoreProfileForm({ r, handoffAllowed }: { r: { tradeName: string; about: string | null; website: string | null; orderingUrl: string | null }; handoffAllowed: boolean }) {
+export function StoreProfileForm({ r }: { r: { tradeName: string; about: string | null; website: string | null } }) {
   return (
     <ActionForm action={saveStoreProfile}>
       {(s) => (
@@ -59,10 +59,32 @@ export function StoreProfileForm({ r, handoffAllowed }: { r: { tradeName: string
             <textarea id="about" name="about" className="textarea" maxLength={400} defaultValue={s?.values?.about ?? r.about ?? ""} />
           </Field>
           <Field name="website" label="Website" state={s}><Input name="website" type="url" defaultValue={r.website ?? ""} placeholder="https://" state={s} /></Field>
-          <Field name="orderingUrl" label="Online ordering page" hint={handoffAllowed ? "Your own licensed ordering page. Cairn links customers here and logs the hand-off." : "Saved, but Cairn won't link to it until online ordering links are enabled for your province."} state={s}>
-            <Input name="orderingUrl" type="url" defaultValue={r.orderingUrl ?? ""} placeholder="https://" state={s} />
-          </Field>
           <div><Submit pending="Saving…">Save profile</Submit></div>
+        </>
+      )}
+    </ActionForm>
+  );
+}
+
+export function OrderingForm({ r, allowed, pickup, delivery }: { r: { acceptsOrders: boolean; pickupLeadMinutes: number; deliveryFeeCents: number; deliveryMinimumCents: number; deliveryRadiusKm: number }; allowed: string | null; pickup: boolean; delivery: boolean }) {
+  return (
+    <ActionForm action={saveOrderingSettings}>
+      {(s) => (
+        <>
+          {allowed && <p className="callout warn small">{allowed}</p>}
+          <label className="check"><input type="checkbox" name="acceptsOrders" defaultChecked={r.acceptsOrders} /><span><span className="strong">Take orders on Cairn</span><br /><span className="small muted">Customers can order for pickup{delivery ? " or delivery" : ""} from locations that offer it. Turn off to pause new orders; your menu stays visible.</span></span></label>
+          <Field name="pickupLeadMinutes" label="Usual time to prepare a pickup order (minutes)" state={s}><Input name="pickupLeadMinutes" inputMode="numeric" defaultValue={String(r.pickupLeadMinutes)} state={s} style={{ maxWidth: 160 }} /></Field>
+          <fieldset className="stack" style={{ ["--gap" as string]: "12px" }}>
+            <legend>Delivery{!delivery && <span className="muted small"> (not available in your province yet)</span>}</legend>
+            <div className="form-row">
+              <Field name="deliveryFee" label="Fee (CAD)" state={s}><Input name="deliveryFee" inputMode="decimal" defaultValue={(r.deliveryFeeCents / 100).toFixed(2)} state={s} /></Field>
+              <Field name="deliveryMinimum" label="Order minimum (CAD)" state={s}><Input name="deliveryMinimum" inputMode="decimal" defaultValue={(r.deliveryMinimumCents / 100).toFixed(2)} state={s} /></Field>
+              <Field name="deliveryRadiusKm" label="Radius (km)" state={s}><Input name="deliveryRadiusKm" inputMode="numeric" defaultValue={String(r.deliveryRadiusKm)} state={s} /></Field>
+            </div>
+            <p className="hint">Delivery is made by your own staff under your licence. Turn it on per location in Locations and hours.</p>
+          </fieldset>
+          {!pickup && <p className="hint">Pickup isn't available in your province yet.</p>}
+          <div><Submit pending="Saving…">Save ordering settings</Submit></div>
         </>
       )}
     </ActionForm>

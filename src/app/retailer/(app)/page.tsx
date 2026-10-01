@@ -25,9 +25,19 @@ export default async function RetailerHome({ searchParams }: { searchParams: Pro
   const stock = await db.execute<{ status: string; c: number }>(sql`select i.status, count(*)::int c from inventory i join locations l on l.id = i.location_id where l.retailer_id = ${retailer.id} group by 1`);
   const out = stock.rows.find((r) => r.status === "OUT")?.c ?? 0;
   const requests = await db.query.partnerRetailers.findMany({ where: and(eq(schema.partnerRetailers.retailerId, retailer.id), eq(schema.partnerRetailers.status, "REQUESTED")), with: { partner: true } });
+  const since = new Date(Date.now() - 30 * 86400e3);
+  const ord = await db.execute<{ open: number; placed: number; done: number; sales: number }>(sql`select
+      count(*) filter (where status in ('PLACED','ACCEPTED','READY','OUT_FOR_DELIVERY'))::int open,
+      count(*) filter (where status = 'PLACED')::int placed,
+      count(*) filter (where status = 'COMPLETED' and created_at >= ${since})::int done,
+      coalesce(sum(total_cents) filter (where status = 'COMPLETED' and created_at >= ${since}), 0)::int sales
+    from orders where retailer_id = ${retailer.id}`);
+  const os = ord.rows[0];
   const daysLeft = trust.licence ? Math.ceil((new Date(trust.licence.expiresAt).getTime() - Date.now()) / 86400e3) : null;
 
   const todos = [
+    os.placed > 0 && { tone: "signal", t: `${os.placed} new ${os.placed === 1 ? "order" : "orders"} waiting to be accepted`, d: "Customers are waiting to hear back.", href: "/retailer/orders", cta: "Open orders" },
+    !retailer.acceptsOrders && trust.listed && { tone: "", t: "You're not taking orders on Cairn", d: "Customers can see your menu but can't order.", href: "/retailer/settings", cta: "Turn on ordering" },
     !trust.listed && trust.state === "pending" && { tone: "warn", t: "Your listing is waiting on licence review", d: "Cairn reviews every licence against the provincial registry. You'll be notified when it's done.", href: "/retailer/compliance", cta: "View licence" },
     trust.state === "expired" && { tone: "bad", t: "Your licence has expired — listing paused", d: "Upload your renewed licence to restore your listing.", href: "/retailer/compliance", cta: "Upload renewal" },
     daysLeft != null && daysLeft > 0 && daysLeft <= 60 && { tone: "warn", t: `Licence expires in ${daysLeft} days`, d: `On ${fmtDate(trust.licence!.expiresAt)}. Submit the renewal early so your listing doesn't pause.`, href: "/retailer/compliance", cta: "Submit renewal" },
@@ -57,10 +67,10 @@ export default async function RetailerHome({ searchParams }: { searchParams: Pro
       )}
 
       <dl className="metrics">
-        <div className="metric"><dt>Visits from partners</dt><dd>{n(a.totals.visits)}</dd><p className="delta">Last 30 days</p></div>
-        <div className="metric"><dt>Sent to your ordering page</dt><dd>{n(allTraffic.totals.handoffs)}</dd><p className="delta">{n(a.totals.handoffs)} via partners</p></div>
-        <div className="metric"><dt>Purchases reported</dt><dd>{n(a.totals.purchases)}</dd><p className="delta">{pct(a.totals.purchases, a.totals.visits)} of partner visits</p></div>
-        <div className="metric"><dt>Referred order value</dt><dd>{money(a.totals.orderCents)}</dd><p className="delta">As reported by you</p></div>
+        <div className="metric"><dt>Open orders</dt><dd>{n(os.open)}</dd><p className="delta"><Link href="/retailer/orders">Order board</Link></p></div>
+        <div className="metric"><dt>Completed orders</dt><dd>{n(os.done)}</dd><p className="delta">Last 30 days</p></div>
+        <div className="metric"><dt>Sales through Cairn</dt><dd>{money(os.sales)}</dd><p className="delta">Collected by you, last 30 days</p></div>
+        <div className="metric"><dt>Visits from partners</dt><dd>{n(a.totals.visits)}</dd><p className="delta">{pct(a.totals.purchases, a.totals.visits)} went on to buy</p></div>
       </dl>
 
       <section className="panel panel-pad mt-3">

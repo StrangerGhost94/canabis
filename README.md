@@ -1,6 +1,6 @@
 # Cairn
 
-A jurisdiction-aware directory connecting adults in Canada with **licensed** cannabis retailers, with a verified referral-partner network and a full admin/compliance console. Cairn never sells, holds, reserves or delivers cannabis and never takes payment — every purchase happens with the licensed store.
+A jurisdiction-aware **marketplace** for licensed cannabis retailers in Canada. Adults browse products across stores, fill a cart from one store, and place a pickup or delivery order. The **licensed store is always the seller**: it accepts the order, prepares it, checks government ID and takes payment at handover. Cairn never holds product or takes payment. Includes a verified referral-partner network and a full admin/compliance console.
 
 See **BRAND.md** for the brand and design rationale.
 
@@ -17,21 +17,28 @@ npm run db:migrate             # applies drizzle/*.sql
 DEMO_MODE=true npm run db:seed # jurisdictions + rules (+ demo data)
 npm run dev
 ```
-Demo accounts (password `cairn-demo-2026`): `customer@`, `retailer@`, `newstore@`, `partner@`, `partner.bc@`, `applicant@`, `admin@` — all `@cairn.demo`.
+Demo accounts (password `cairn-demo-2026`): `customer@`, `morgan@`, `retailer@`, `newstore@`, `partner@`, `partner.bc@`, `applicant@`, `admin@` — all `@cairn.demo`. The demo seeds open orders on Larchmont Supply's board.
 
 Production: `npm run build && npm start`. Set `DEMO_MODE=false`, a strong `SESSION_SECRET`, `HASH_SALT`, `CRON_SECRET`, and schedule `POST /api/cron/licences` daily with header `x-cron-secret`.
 
 ## What's in it
-**Customers** — province/age gate, discovery (search, format, THC:CBD balance, price where permitted, in-stock, open-now, distance), product and store pages with the verification record and a clear "you buy from" block, schematic distance locator, saved stores/products, notifications, settings.
+**Customers** — province/age gate, storefront home with format shelves, shop grid with filters (format, THC:CBD balance, price where permitted, in stock, open now, distance), store pages with per-location stock, product pages, one-store cart (guest carts carry over on sign-in), live 30 g possession-limit meter, checkout for pickup or delivery with ID confirmation, order tracking with progress and notifications, saved items, settings.
 
-**Retailers** — onboarding with licence upload, menu and per-location stock, hours and locations, store profile and ordering link, partner requests with optional commission, purchase reporting (console + REST API with hashed keys), licence renewal, view of the rules that apply to them.
+**Retailers** — onboarding with licence upload, order board (new / preparing / ready to hand over) with accept, decline with reason, ready or out-for-delivery, and completion gated on an ID check; menu and per-location stock, product pack shots, dried-cannabis equivalents, ordering settings (on/off, prep time, delivery fee/minimum/radius), locations and hours, partner requests, purchase reporting API for off-platform sales, licence renewal.
 
 **Partners** — application with conduct attestation, review status, links per campaign with QR codes (SVG download), store partnership requests, funnel analytics, earnings (only where permitted), public profile with automatic paid-recommendation disclosure.
 
 **Admins** — overview, verification queue (licences and partners), retailers/partners/users/products enforcement, referrals and commission approval, jurisdiction rules matrix, risk flags and public reports, audit log, system/provider status and licence sweep.
 
+## Ordering model
+- `src/lib/cart.ts` — one cart per browser or user, one store per cart (asks before replacing), quantity caps, and the federal **30 g public-possession limit** computed from each product's label equivalent.
+- `src/lib/orders.ts` — order placement and a strict state machine: `PLACED → ACCEPTED → READY | OUT_FOR_DELIVERY → COMPLETED`, with `REJECTED`/`CANCELLED` exits. Only the store can advance an order; the customer can cancel only before acceptance; completion requires the store to confirm an ID check. Every step is timestamped, audit-logged and notified.
+- Delivery postal codes must be in the store's province. Customers can only order from stores in their own province.
+- Completed orders that arrived through a partner link create the partner's conversion (and commission, only where permitted) automatically.
+- No payment processing: totals are shown as "pay the store at handover". Integrating a store-side payment provider is a store decision and must keep the retailer as merchant of record.
+
 ## Compliance architecture
-- `src/lib/compliance/rules.ts` — catalogue of capabilities that depend on provincial/territorial law (listing, product visibility, prices, ordering hand-off, pickup, delivery, promotions, vapes, edibles, partner referrals/profiles/compensation).
+- `src/lib/compliance/rules.ts` — catalogue of capabilities that depend on provincial/territorial law (listing, product visibility, prices, ordering through Cairn, pickup, delivery, promotions, vapes, edibles, partner referrals/profiles/compensation).
 - **Fail-closed**: a capability is on only with an `ALLOWED` determination. Missing, `UNCONFIRMED` and `PROHIBITED` are all off. New keys start unconfirmed everywhere. Setting a determination requires a cited legal basis and confirmation, and is audit-logged.
 - Legal age per jurisdiction (seeded 18 AB, 21 QC, 19 elsewhere — **verify before launch**), enforced at the gate, at sign-up from date of birth, and on province change.
 - Product and profile copy is screened for health claims, youth appeal, lifestyle language and inducements (`copy-check.ts`) — a first pass, not a substitute for legal review.

@@ -50,13 +50,13 @@ export default async function PartnerHome() {
       {!policy.allows("partner.referrals") && <p className="callout warn small mb-3">{policy.offMessage("partner.referrals")} Your links still work but aren't attributed.</p>}
       <dl className="metrics">
         <div className="metric"><dt>Visits</dt><dd>{n(a.totals.visits)}</dd><p className="delta">People who followed your links</p></div>
-        <div className="metric"><dt>Went on to a store</dt><dd>{n(a.totals.handoffs)}</dd><p className="delta">{pct(a.totals.handoffs, a.totals.visits)} of visits</p></div>
+        <div className="metric"><dt>Placed an order</dt><dd>{n(a.totals.handoffs)}</dd><p className="delta">{pct(a.totals.handoffs, a.totals.visits)} of visits</p></div>
         <div className="metric"><dt>Purchases</dt><dd>{n(a.totals.purchases)}</dd><p className="delta">Confirmed by stores</p></div>
         <div className="metric"><dt>{pay ? "Earned" : "Earnings"}</dt><dd>{pay ? money(a.totals.commissionCents) : "—"}</dd><p className="delta">{pay ? "Pending and approved" : "Not available in your province"}</p></div>
       </dl>
       <section className="panel panel-pad mt-3">
         <h2 className="h4 mb-2">Daily, last 30 days</h2>
-        <DailyBars label="Partner activity" days={a.days} series={[{ name: "Visits", values: a.visits }, { name: "Went on to a store", values: a.handoffs, alt: true }]} />
+        <DailyBars label="Partner activity" days={a.days} series={[{ name: "Visits", values: a.visits }, { name: "Placed an order", values: a.handoffs, alt: true }]} />
       </section>
       <section className="mt-3">
         <h2 className="h4 mb-2">Your links</h2>

@@ -37,10 +37,10 @@ export async function setNear(_: ActionState, form: FormData): Promise<ActionSta
     return { error: "That area is in a different province. Change your province first." };
   }
   jar.set(NEAR_COOKIE, place.key, opts);
-  redirect(String(form.get("next") || "/discover"));
+  redirect(String(form.get("next") || "/shop"));
 }
 
 export async function clearNear() {
   (await cookies()).delete(NEAR_COOKIE);
-  redirect("/discover");
+  redirect("/shop");
 }

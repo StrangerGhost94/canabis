@@ -11,7 +11,7 @@ export async function SiteFooter() {
             <span className="cairn" aria-hidden><i /><i /><i /></span>Cairn
           </span>
           <p>
-            Cairn is a directory. It doesn't sell, hold or deliver cannabis. Every purchase is made with a licensed retailer, under the rules of your province or territory.
+            Cairn is a marketplace for licensed cannabis stores. Every order is fulfilled and paid for at a licensed store, under the rules of your province or territory. Cairn never holds product or takes payment.
           </p>
           {v.policy && (
             <p>
@@ -21,7 +21,7 @@ export async function SiteFooter() {
         </div>
         <div>
           <p className="strong" style={{ color: "var(--ink)" }}>Explore</p>
-          <ul><li><Link href="/discover">Discover</Link></li><li><Link href="/how-it-works">How verification works</Link></li></ul>
+          <ul><li><Link href="/shop">Shop</Link></li><li><Link href="/stores">Stores</Link></li><li><Link href="/how-it-works">How verification works</Link></li></ul>
         </div>
         <div>
           <p className="strong" style={{ color: "var(--ink)" }}>Work with Cairn</p>

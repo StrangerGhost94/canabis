@@ -16,19 +16,19 @@ export function Filters({ categories, showPrice, activeCount }: Props) {
     const fd = new FormData(form);
     const params = new URLSearchParams();
     for (const [k, v] of fd.entries()) if (v) params.set(k, String(v));
-    start(() => router.replace(`/discover?${params.toString()}`, { scroll: false }));
+    start(() => router.replace(`/shop?${params.toString()}`, { scroll: false }));
   };
 
   const body = (idp: string) => (
     <form
-      action="/discover"
+      action="/shop"
       className="stack filters"
       style={{ ["--gap" as string]: "22px" }}
       onChange={(e) => apply(e.currentTarget)}
       onSubmit={(e) => { e.preventDefault(); apply(e.currentTarget); sheet.current?.close(); }}
       aria-busy={pending}
     >
-      {["q", "view", "sort"].map((k) => sp.get(k) && <input key={k} type="hidden" name={k} value={sp.get(k)!} />)}
+      {["q", "sort"].map((k) => sp.get(k) && <input key={k} type="hidden" name={k} value={sp.get(k)!} />)}
       <fieldset>
         <legend>Format</legend>
         <div className="seg">
@@ -61,7 +61,7 @@ export function Filters({ categories, showPrice, activeCount }: Props) {
         <label className="check"><input type="checkbox" name="stock" value="1" defaultChecked={sp.get("stock") === "1"} />In stock at a nearby location</label>
         <label className="check"><input type="checkbox" name="open" value="1" defaultChecked={sp.get("open") === "1"} />Open now</label>
       </fieldset>
-      <a href={`/discover${sp.get("view") ? `?view=${sp.get("view")}` : ""}`} className="small">Clear filters</a>
+      <a href="/shop" className="small">Clear filters</a>
       <button className="btn primary show-sm">Show results</button>
     </form>
   );
