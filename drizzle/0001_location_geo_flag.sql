@@ -1,0 +1,1 @@
+ALTER TABLE "locations" ADD COLUMN "geo_approximate" boolean DEFAULT false NOT NULL;

@@ -1,0 +1,51 @@
+# Cairn
+
+A jurisdiction-aware directory connecting adults in Canada with **licensed** cannabis retailers, with a verified referral-partner network and a full admin/compliance console. Cairn never sells, holds, reserves or delivers cannabis and never takes payment — every purchase happens with the licensed store.
+
+See **BRAND.md** for the brand and design rationale.
+
+> **Demo data.** With `DEMO_MODE=true`, every store, licence (`DEMO-…`), person, partner and order is fictional and labelled as such in the UI. "Simulated" licence checks never consult a real registry. The demo jurisdiction settings (Ontario, BC, Alberta) are **not legal determinations** — they exist only so the product can be explored.
+
+## Stack
+Next.js 15 (App Router, server actions) · React 19 · TypeScript · PostgreSQL · Drizzle ORM · Zod · argon2id · hand-written CSS design system (no UI kit) · no client-side analytics or third-party scripts.
+
+## Run it
+```bash
+cp .env.example .env          # fill in secrets
+npm install
+npm run db:migrate             # applies drizzle/*.sql
+DEMO_MODE=true npm run db:seed # jurisdictions + rules (+ demo data)
+npm run dev
+```
+Demo accounts (password `cairn-demo-2026`): `customer@`, `retailer@`, `newstore@`, `partner@`, `partner.bc@`, `applicant@`, `admin@` — all `@cairn.demo`.
+
+Production: `npm run build && npm start`. Set `DEMO_MODE=false`, a strong `SESSION_SECRET`, `HASH_SALT`, `CRON_SECRET`, and schedule `POST /api/cron/licences` daily with header `x-cron-secret`.
+
+## What's in it
+**Customers** — province/age gate, discovery (search, format, THC:CBD balance, price where permitted, in-stock, open-now, distance), product and store pages with the verification record and a clear "you buy from" block, schematic distance locator, saved stores/products, notifications, settings.
+
+**Retailers** — onboarding with licence upload, menu and per-location stock, hours and locations, store profile and ordering link, partner requests with optional commission, purchase reporting (console + REST API with hashed keys), licence renewal, view of the rules that apply to them.
+
+**Partners** — application with conduct attestation, review status, links per campaign with QR codes (SVG download), store partnership requests, funnel analytics, earnings (only where permitted), public profile with automatic paid-recommendation disclosure.
+
+**Admins** — overview, verification queue (licences and partners), retailers/partners/users/products enforcement, referrals and commission approval, jurisdiction rules matrix, risk flags and public reports, audit log, system/provider status and licence sweep.
+
+## Compliance architecture
+- `src/lib/compliance/rules.ts` — catalogue of capabilities that depend on provincial/territorial law (listing, product visibility, prices, ordering hand-off, pickup, delivery, promotions, vapes, edibles, partner referrals/profiles/compensation).
+- **Fail-closed**: a capability is on only with an `ALLOWED` determination. Missing, `UNCONFIRMED` and `PROHIBITED` are all off. New keys start unconfirmed everywhere. Setting a determination requires a cited legal basis and confirmation, and is audit-logged.
+- Legal age per jurisdiction (seeded 18 AB, 21 QC, 19 elsewhere — **verify before launch**), enforced at the gate, at sign-up from date of birth, and on province change.
+- Product and profile copy is screened for health claims, youth appeal, lifestyle language and inducements (`copy-check.ts`) — a first pass, not a substitute for legal review.
+
+## Verification
+`src/lib/verification/providers.ts` defines the `LicenceVerifier` interface:
+- `MANUAL_REGISTRY_CHECK` — real: a reviewer compares with the regulator's public registry and must record the reference.
+- `EXTERNAL_API` — integration point; throws until a real, contracted source is connected.
+- `DEMO_SIMULATED` — demo only, accepts `DEMO-` numbers, disabled when `DEMO_MODE=false`, always labelled "Simulated".
+
+Listings are filtered at read time (verified retailer + verified, unexpired licence), so a lapsed licence disappears from discovery the day it expires; the daily sweep records the change and notifies the store (30- and 7-day reminders too).
+
+## Security
+argon2id passwords · DB-backed sessions (hashed tokens, httpOnly/SameSite cookies, `__Host-` in prod) · RBAC plus tenant checks on every action · Zod validation everywhere · Postgres-backed rate limiting (sign-in, sign-up, reports, API, referral/hand-off routes) · append-only audit log · IPs and visitor ids stored only as keyed hashes · uploads sniffed by magic bytes, size-capped, stored outside the web root and served only to admins/owners · strict security headers and CSP · server-action origin checks (Next.js) · no secrets in client code.
+
+## Integration points to connect before launch
+Licence registry API · geocoding (`resolvePlace` in `src/lib/geo.ts` is a demo lookup; unknown postcodes are flagged approximate and never show distances) · email/SMS for notifications · partner payouts and tax details · legal review of every jurisdiction rule and the legal-age table.
