@@ -3,10 +3,10 @@ import { Suspense } from "react";
 import { Filters } from "@/components/discover/filters";
 import { NearControl } from "@/components/discover/near-form";
 import { ProductCard } from "@/components/product-card";
-import { StoreCard } from "@/components/store-card";
 import { allowedCategories } from "@/lib/compliance";
 import { CATEGORIES, CATEGORY_LABEL, n } from "@/lib/format";
-import { COLLECTIONS, discover, orderBlock, parseDiscover, toListings } from "@/lib/queries";
+import { COLLECTIONS, discover, listingBlock, parseDiscover, toListings } from "@/lib/queries";
+import { buyerPoint } from "@/lib/cart";
 import { getVisitor } from "@/lib/visitor";
 
 export const metadata = { title: "Shop" };
@@ -19,15 +19,15 @@ export default async function Shop({ searchParams }: { searchParams: Promise<Rec
   const here = `/shop${qs.size ? `?${qs}` : ""}`;
   if (!v.policy) return <div className="wrap section"><p className="muted">Choose your province or territory to start.</p></div>;
   const policy = v.policy;
-  const { products, stores, blocked } = await discover(policy, v.near, p);
+  const point = await buyerPoint();
+  const { products, blocked } = await discover(policy, point, p);
   const showPrices = policy.allows("retail.prices");
   const cats = allowedCategories(policy, CATEGORIES).map((c) => ({ value: c, label: CATEGORY_LABEL[c] }));
   const hidden = CATEGORIES.filter((c) => !cats.some((x) => x.value === c));
   const activeCount = [p.category, p.ratio, p.max, p.stock, p.open].filter(Boolean).length;
   const sort = p.sort ?? (v.near ? "near" : "name");
   const sortHref = (s: string) => { const q = new URLSearchParams(qs); q.set("sort", s); return `/shop?${q}`; };
-  const storeHits = p.q ? stores.filter((r) => r.tradeName.toLowerCase().includes(p.q!.toLowerCase())) : [];
-  const listings = toListings(products);
+  const listings = toListings(products, point);
   const brandName = p.brand ? products.find((x) => x.brand.toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/[\s_]+/g, "-") === p.brand)?.brand : null;
   const collection = p.collection ? COLLECTIONS[p.collection] : null;
   const title = p.q ? `Results for “${p.q}”` : collection ? collection.title : brandName ?? (p.category ? CATEGORY_LABEL[p.category] : "Shop all");
@@ -37,9 +37,9 @@ export default async function Shop({ searchParams }: { searchParams: Promise<Rec
       <div className="shop-head">
         <div>
           <h1 className="h1">{title}</h1>
-          <p className="small muted mt-1" aria-live="polite">{collection ? `${collection.blurb} ` : ""}{n(listings.length)} {listings.length === 1 ? "listing" : "listings"} from {n(new Set(products.map((x) => x.retailerId)).size)} licensed stores in {policy.name}</p>
+          <p className="small muted mt-1" aria-live="polite">{collection ? `${collection.blurb} ` : ""}{n(listings.length)} {listings.length === 1 ? "listing" : "listings"} from licensed stores in {policy.name}{point ? ` · ${listings.filter((x) => x.deliverable).length} deliver to you` : ""}</p>
         </div>
-        <NearControl label={v.near?.label ?? null} next={here} />
+        <NearControl label={point?.label ?? null} next={here} />
       </div>
       <form action="/shop" role="search" className="shop-search show-sm">
         <label htmlFor="sq" className="sr-only">Search</label>
@@ -58,13 +58,6 @@ export default async function Shop({ searchParams }: { searchParams: Promise<Rec
             </div>
           </div>
 
-          {storeHits.length > 0 && (
-            <div className="mb-3 stack" style={{ ["--gap" as string]: "10px" }}>
-              <p className="small strong">Stores</p>
-              <div className="store-grid">{storeHits.map((r) => <StoreCard key={r.id} r={r} policy={policy} />)}</div>
-            </div>
-          )}
-
           {blocked ? (
             <div className="callout"><p className="strong">No stores listed in {policy.name} yet</p><p className="small muted">{policy.offMessage("retail.directory")}</p></div>
           ) : !policy.allows("retail.products") ? (
@@ -79,8 +72,8 @@ export default async function Shop({ searchParams }: { searchParams: Promise<Rec
           ) : (
             <div className="pgrid">
               {listings.map((x) => (
-                <ProductCard key={x.id} p={x} store={{ name: x.retailer.tradeName, slug: x.retailer.slug }} showPrice={showPrices}
-                  orderable={orderBlock(policy, x.retailer)} stock={x.best?.stock} distance={x.best?.distance} />
+                <ProductCard key={x.id} p={x} showPrice={showPrices} deliverable={x.deliverable}
+                  orderable={listingBlock(policy, x.orderable)} stock={x.best?.stock} />
               ))}
             </div>
           )}

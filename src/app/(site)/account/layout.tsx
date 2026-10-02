@@ -7,6 +7,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
     <div className="wrap section-account">
       <NavLinks className="nav account-tabs" links={[
         { href: "/account", label: "Overview" },
+        { href: "/account/verify", label: "ID verification" },
         { href: "/account/saved", label: "Saved" },
         { href: "/account/notifications", label: "Notifications" },
         { href: "/account/settings", label: "Settings" },

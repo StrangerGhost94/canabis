@@ -7,7 +7,8 @@ import { OPEN_STATUSES, STATUS_LABEL, STATUS_TONE } from "@/lib/orders";
 
 export const metadata = { title: "Your orders" };
 
-export default async function Orders() {
+export default async function Orders({ searchParams }: { searchParams: Promise<{ placed?: string }> }) {
+  const { placed } = await searchParams;
   const u = await requireUser("/orders");
   const orders = await db.query.orders.findMany({ where: eq(schema.orders.userId, u.id), with: { retailer: true, items: true, location: true }, orderBy: desc(schema.orders.createdAt), limit: 50 });
   const open = orders.filter((o) => OPEN_STATUSES.includes(o.status));
@@ -27,6 +28,7 @@ export default async function Orders() {
   return (
     <div className="wrap section-account" style={{ maxWidth: 860, paddingBlock: "24px 64px" }}>
       <h1 className="h1 mb-3">Your orders</h1>
+      {placed && <p className="flash mb-3">Your order was placed in {placed} parts, each with the nearest licensed store that had those items. Each store will confirm here.</p>}
       {orders.length === 0 ? (
         <div className="empty panel"><span className="cairn" aria-hidden><i /><i /><i /></span><p className="h4">No orders yet</p><p className="small muted">When you order from a store, you can follow it here.</p><Link href="/shop" className="btn primary sm">Start shopping</Link></div>
       ) : (

@@ -2,17 +2,19 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProductCard } from "@/components/product-card";
 import { CATEGORY_LABEL } from "@/lib/format";
-import { discover, orderBlock, toListings } from "@/lib/queries";
+import { discover, listingBlock, toListings } from "@/lib/queries";
+import { buyerPoint } from "@/lib/cart";
 import { getVisitor } from "@/lib/visitor";
 
 export default async function Brand({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const v = await getVisitor();
   if (!v.policy) return <div className="wrap section"><p className="muted">Choose your province or territory to start.</p></div>;
-  const { products } = await discover(v.policy, v.near, { brand: slug, sort: v.near ? "near" : "name" });
+  const point = await buyerPoint();
+  const { products } = await discover(v.policy, point, { brand: slug, sort: point ? "near" : "name" });
   if (!products.length) notFound();
   const name = products[0].brand;
-  const listings = toListings(products);
+  const listings = toListings(products, point);
   const cats = [...new Set(products.map((p) => p.category))];
   const stores = [...new Map(products.map((p) => [p.retailer.id, p.retailer])).values()];
   return (
@@ -25,8 +27,8 @@ export default async function Brand({ params }: { params: Promise<{ slug: string
       </header>
       <div className="pgrid mt-5">
         {listings.map((x) => (
-          <ProductCard key={x.id} p={x} store={{ name: x.retailer.tradeName, slug: x.retailer.slug }} showPrice={v.policy!.allows("retail.prices")}
-            orderable={orderBlock(v.policy!, x.retailer)} stock={x.best?.stock} distance={x.best?.distance} />
+          <ProductCard key={x.id} p={x} showPrice={v.policy!.allows("retail.prices")} deliverable={x.deliverable}
+            orderable={listingBlock(v.policy!, x.orderable)} stock={x.best?.stock} />
         ))}
       </div>
       <style>{`.brand-hero { display: grid; gap: 16px; max-width: 760px; padding-bottom: 32px; border-bottom: 1px solid var(--rule); }`}</style>

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { CATEGORY_LABEL, money, potency } from "@/lib/format";
-import { fmtKm } from "@/lib/geo";
 import { AddToCart } from "./add-to-cart";
 import { PackArt } from "./pack-art";
 
@@ -17,14 +16,14 @@ export const brandSlug = (b: string) => b.toLowerCase().normalize("NFKD").replac
  * name, format, size), how strong (THC / CBD), where and for how much.
  * A product several stores sell is one card that leads to a store comparison.
  */
-export function ProductCard({ p, store, showPrice, orderable, stock, distance, showStore = true }: {
-  p: CardProduct; store: { name: string; slug: string }; showPrice: boolean; orderable: string | null; stock?: "IN_STOCK" | "LOW" | "OUT"; distance?: number | null; showStore?: boolean;
+export function ProductCard({ p, showPrice, orderable, stock, deliverable = null }: {
+  p: CardProduct; store?: { name: string; slug: string }; showPrice: boolean; orderable: string | null; stock?: "IN_STOCK" | "LOW" | "OUT"; distance?: number | null; showStore?: boolean;
+  /** true: a licensed store delivers this to the buyer; false: not to their address yet; null: we don't know where they are. */
+  deliverable?: boolean | null;
 }) {
   const pot = potency(p);
   const out = stock === "OUT";
-  const offers = p.offerCount ?? 1;
-  const multi = offers > 1;
-  const from = multi && p.minPriceCents != null && p.minPriceCents < p.priceCents;
+  const from = deliverable == null && (p.offerCount ?? 1) > 1 && p.minPriceCents != null && p.minPriceCents < p.priceCents;
   return (
     <article className={`pcard ${out ? "is-out" : ""}`}>
       <Link href={`/products/${p.id}`} className="pcard-shelf" style={{ background: `var(--t-${p.category})` }} aria-hidden tabIndex={-1}>
@@ -49,16 +48,11 @@ export function ProductCard({ p, store, showPrice, orderable, stock, distance, s
                 ? <>{from && <small>From</small>}{money(from ? p.minPriceCents! : p.priceCents)}</>
                 : <small>Price shown in store</small>}
             </span>
-            {showStore && (
-              <p className="pcard-where mt-1">
-                {multi
-                  ? <span>At {offers} stores</span>
-                  : <><span className="lic" aria-label="Licensed store">✓</span><Link href={`/stores/${store.slug}`}>{store.name}</Link>{distance != null && <span className="num">· {fmtKm(distance)}</span>}</>}
-              </p>
-            )}
+            <p className={`pcard-where mt-1 ${deliverable ? "ok" : ""}`}>
+              {deliverable === true ? "Delivers to you" : deliverable === false ? "Not delivering to you yet" : "From licensed stores"}
+            </p>
           </div>
-          {!out && !multi && <AddToCart productId={p.id} name={p.name} disabled={orderable} />}
-          {!out && multi && <Link href={`/products/${p.id}#offers`} className="btn sm">Compare</Link>}
+          {!out && <AddToCart productId={p.id} name={p.name} disabled={orderable} />}
         </div>
       </div>
     </article>

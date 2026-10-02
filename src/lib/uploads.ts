@@ -1,7 +1,8 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { randomToken } from "./crypto";
 import { env } from "./env";
@@ -26,13 +27,15 @@ export class UploadError extends UserFacingError {}
  */
 export async function storeDocument(
   file: File,
-  owner: { uploadedById: string; licenceId?: string; partnerId?: string },
+  owner: { uploadedById: string; licenceId?: string; partnerId?: string; subjectUserId?: string },
+  opts: { imagesOnly?: boolean } = {},
 ) {
   if (!file || file.size === 0) throw new UploadError("Choose a file to upload.");
   if (file.size > MAX_BYTES) throw new UploadError("Files must be 10 MB or smaller.");
   const buf = Buffer.from(await file.arrayBuffer());
   const kind = sniff(buf);
   if (!kind) throw new UploadError("Upload a PDF, JPEG or PNG.");
+  if (opts.imagesOnly && kind.mime === "application/pdf") throw new UploadError("Upload a photo (JPEG or PNG).");
   const storageKey = `${new Date().toISOString().slice(0, 7)}/${randomToken(18)}.${kind.ext}`;
   const full = path.resolve(env.UPLOAD_DIR, storageKey);
   await mkdir(path.dirname(full), { recursive: true });
@@ -75,4 +78,12 @@ export async function storeMedia(file: File) {
 export async function readMedia(key: string) {
   if (!/^[\w-]+\.(jpg|png)$/.test(key)) throw new UploadError("Invalid image.");
   return { buf: await readFile(path.resolve(env.UPLOAD_DIR, "media", key)), mime: key.endsWith(".png") ? "image/png" : "image/jpeg" };
+}
+
+/** Permanently remove a stored document and its record. */
+export async function deleteDocument(doc: { id: string; storageKey: string }) {
+  const root = path.resolve(env.UPLOAD_DIR);
+  const full = path.resolve(root, doc.storageKey);
+  if (full.startsWith(root + path.sep)) await unlink(full).catch(() => undefined);
+  await db.delete(schema.documents).where(eq(schema.documents.id, doc.id));
 }

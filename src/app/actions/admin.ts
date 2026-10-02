@@ -9,6 +9,8 @@ import { destroyAllSessions, requireRole } from "@/lib/auth/session";
 import { RULE_KEYS } from "@/lib/compliance/rules";
 import { notify } from "@/lib/notify";
 import { sweepLicences } from "@/lib/verification/sweep";
+import { ageFrom, getPolicy } from "@/lib/compliance";
+import { deleteDocument } from "@/lib/uploads";
 
 const admin = () => requireRole("ADMIN", "/admin");
 
@@ -206,4 +208,39 @@ export async function runLicenceSweep(_: ActionState): Promise<ActionState> {
   await audit({ actorId: me.id, action: "system.licence_sweep", targetType: "system", metadata: r });
   revalidatePath("/admin", "layout");
   return ok(`Checked licences: ${r.expired} expired, ${r.reminded} reminders sent.`);
+}
+
+// ─── Buyer ID review ────────────────────────────────────────────────────────
+
+export async function reviewBuyer(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const me = await admin();
+    const d = z.object({
+      userId: z.string(),
+      decision: z.enum(["VERIFIED", "REJECTED"]),
+      notes: z.string().trim().max(500).optional(),
+      matches: z.string().optional(),
+    }).parse(Object.fromEntries([...form.entries()].filter(([, v]) => v !== "")));
+    const u = await db.query.users.findFirst({ where: eq(schema.users.id, d.userId) });
+    if (!u || u.idStatus !== "PENDING") throw new UserFacingError("This buyer isn't waiting for review.");
+    if (d.decision === "VERIFIED") {
+      if (d.matches !== "yes") throw new z.ZodError([{ code: "custom", path: ["matches"], message: "Confirm the ID matches and shows legal age." }]);
+      const policy = await getPolicy(u.jurisdictionCode);
+      if (ageFrom(u.birthDate) < policy.legalAge) throw new UserFacingError(`The account's date of birth is under ${policy.legalAge}, the legal age in ${policy.name}.`);
+    } else if (!d.notes) {
+      throw new z.ZodError([{ code: "custom", path: ["notes"], message: "Tell the buyer what to fix." }]);
+    }
+    await db.update(schema.users).set({ idStatus: d.decision, idReviewedAt: new Date(), idReviewedById: me.id, idReviewNotes: d.notes ?? null }).where(eq(schema.users.id, u.id));
+    // Privacy: the images are only needed for the decision.
+    const docs = await db.query.documents.findMany({ where: eq(schema.documents.subjectUserId, u.id) });
+    for (const doc of docs) await deleteDocument(doc);
+    await audit({ actorId: me.id, action: `buyer.id_${d.decision.toLowerCase()}`, targetType: "user", targetId: u.id, metadata: { notes: d.notes } });
+    await notify([u.id], d.decision === "VERIFIED"
+      ? { title: "You're verified", body: "Your ID checked out. You can now order anywhere Cairn delivers.", href: "/shop" }
+      : { title: "We couldn't verify your ID", body: d.notes ?? "", href: "/account/verify" });
+    revalidatePath("/admin/verification");
+    return ok(d.decision === "VERIFIED" ? "Buyer verified. ID images deleted." : "Buyer notified. ID images deleted.");
+  } catch (e) {
+    return fail(e, form);
+  }
 }

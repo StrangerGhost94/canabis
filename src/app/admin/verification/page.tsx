@@ -1,27 +1,66 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import Link from "next/link";
 import { db, schema } from "@/db";
-import { LicenceReviewForm, PartnerReviewForm } from "@/components/admin/forms";
+import { BuyerReviewForm, LicenceReviewForm, PartnerReviewForm } from "@/components/admin/forms";
 import { ConsoleHead } from "@/components/console/shell";
-import { getPolicy } from "@/lib/compliance";
+import { ageFrom, getPolicy } from "@/lib/compliance";
 import { relTime } from "@/lib/format";
 import { fmtDate } from "@/lib/verification/trust";
 
 export const metadata = { title: "Verification queue" };
 
 export default async function Verification({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const tab = (await searchParams).tab === "partners" ? "partners" : "licences";
+  const t = (await searchParams).tab;
+  const buyers = await db.query.users.findMany({ where: eq(schema.users.idStatus, "PENDING"), orderBy: (u, { asc }) => asc(u.idSubmittedAt) });
+  const tab = t === "partners" ? "partners" : t === "buyers" || (!t && buyers.length) ? "buyers" : "licences";
+  const buyerDocs = buyers.length ? await db.query.documents.findMany({ where: inArray(schema.documents.subjectUserId, buyers.map((b) => b.id)), orderBy: (d, { asc }) => asc(d.createdAt) }) : [];
   const licences = await db.query.licences.findMany({ where: eq(schema.licences.status, "PENDING"), with: { retailer: { with: { locations: true } }, documents: true }, orderBy: (l, { asc }) => asc(l.createdAt) });
   const partners = await db.query.partners.findMany({ where: sql`${schema.partners.status} in ('APPLIED','UNDER_REVIEW')`, with: { user: true }, orderBy: (p, { asc }) => asc(p.createdAt) });
   return (
     <>
       <ConsoleHead title="Verification queue" sub="Nothing goes live without a decision recorded here. Oldest first." />
       <div className="seg mb-3" role="tablist">
-        <Link role="tab" aria-selected={tab === "licences"} href="/admin/verification" className={`chip ${tab === "licences" ? "on" : ""}`}>Licences ({licences.length})</Link>
+        <Link role="tab" aria-selected={tab === "buyers"} href="/admin/verification?tab=buyers" className={`chip ${tab === "buyers" ? "on" : ""}`}>Buyer IDs ({buyers.length})</Link>
+        <Link role="tab" aria-selected={tab === "licences"} href="/admin/verification?tab=licences" className={`chip ${tab === "licences" ? "on" : ""}`}>Licences ({licences.length})</Link>
         <Link role="tab" aria-selected={tab === "partners"} href="/admin/verification?tab=partners" className={`chip ${tab === "partners" ? "on" : ""}`}>Partners ({partners.length})</Link>
       </div>
 
-      {tab === "licences" ? (
+      {tab === "buyers" ? (
+        buyers.length === 0 ? <Empty what="buyer IDs" /> : (
+          <div id="buyers" className="stack" style={{ ["--gap" as string]: "20px" }}>
+            {await Promise.all(buyers.map(async (b) => {
+              const policy = await getPolicy(b.jurisdictionCode);
+              const docs = buyerDocs.filter((d) => d.subjectUserId === b.id);
+              const age = ageFrom(b.birthDate);
+              return (
+                <article key={b.id} className="panel review">
+                  <div className="panel-pad stack" style={{ ["--gap" as string]: "12px" }}>
+                    <h2 className="h3">{b.name}</h2>
+                    <dl className="kv">
+                      <dt>Account</dt><dd>{b.email}</dd>
+                      <dt>Date of birth</dt><dd className="num">{b.birthDate} <span className={age >= policy.legalAge ? "status ok" : "status bad"}>{age} years</span></dd>
+                      <dt>Province</dt><dd>{policy.name} (legal age {policy.legalAge})</dd>
+                      <dt>Submitted</dt><dd>{b.idSubmittedAt ? relTime(b.idSubmittedAt) : "—"}</dd>
+                    </dl>
+                    <div className="id-docs">
+                      {docs.map((d, i) => (
+                        <a key={d.id} href={`/api/documents/${d.id}`} target="_blank" rel="noreferrer" className="id-doc">
+                          {d.mimeType.startsWith("image/")
+                            // eslint-disable-next-line @next/next/no-img-element
+                            ? <img src={`/api/documents/${d.id}`} alt={i === 0 ? "Government ID" : "Selfie"} />
+                            : <span className="small">Open PDF</span>}
+                          <span className="xs muted">{i === 0 ? "Government ID" : "Selfie"}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="panel-pad review-form"><BuyerReviewForm userId={b.id} legalAge={policy.legalAge} /></div>
+                </article>
+              );
+            }))}
+          </div>
+        )
+      ) : tab === "licences" ? (
         licences.length === 0 ? <Empty what="licences" /> : (
           <div className="stack" style={{ ["--gap" as string]: "20px" }}>
             {await Promise.all(licences.map(async (l) => {
@@ -72,6 +111,9 @@ export default async function Verification({ searchParams }: { searchParams: Pro
       <style>{`
         .review { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
         .review-form { border-left: 1px solid var(--rule); background: color-mix(in srgb, var(--surface) 60%, var(--bg)); border-radius: 0 var(--r-panel) var(--r-panel) 0; }
+        .id-docs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .id-doc { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--rule); border-radius: 12px; text-decoration: none; color: var(--ink); }
+        .id-doc img { width: 100%; height: 220px; object-fit: contain; background: var(--bg); border-radius: 8px; }
         .kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 16px; margin: 0; font-size: var(--t-sm); }
         .kv dt { color: var(--ink-2); }
         .kv dd { margin: 0; }

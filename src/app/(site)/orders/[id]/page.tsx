@@ -34,7 +34,8 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   return (
     <div className="wrap" style={{ maxWidth: 960, paddingBlock: "24px 64px" }}>
       <p className="small mb-2"><Link href="/orders">Your orders</Link></p>
-      {placed && <p className="flash mb-3">Order placed. {o.retailer.tradeName} has been notified, and you'll hear back here when it's accepted.</p>}
+      {placed && <p className="flash mb-3">Order placed with {o.retailer.tradeName}, the nearest licensed store with everything in stock. You'll hear back here when it's accepted.</p>}
+      {o.routingExcluded.length > 0 && o.status === "PLACED" && <p className="callout small mb-3">The first store couldn't fill this order, so we moved it to {o.retailer.tradeName}. You can cancel any time before it's accepted.</p>}
       <div className="row between top mb-3">
         <div>
           <p className="small muted">Order {o.number}</p>

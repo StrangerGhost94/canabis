@@ -634,3 +634,5 @@ a.icard:hover { box-shadow: var(--shadow-card); border-color: var(--rule); text-
 .icard > p + p, .steps li > p + p { margin-top: 0; }
 .opening-steps p + p, .hero-card p + p { margin-top: 2px; }
 .store-hero { border-radius: 22px; }
+.pcard-where.ok { color: var(--pine); font-weight: 560; }
+.pcard-where.ok::before { content: ""; width: 7px; height: 7px; border-radius: 9px; background: currentColor; }

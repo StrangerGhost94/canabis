@@ -4,20 +4,20 @@ import { IconBag, IconCheck, IconPin, IconSearch, IconShield, IconStore } from "
 import { NearControl } from "@/components/discover/near-form";
 import { PackArt } from "@/components/pack-art";
 import { ProductCard } from "@/components/product-card";
-import { StoreCard } from "@/components/store-card";
 import { allowedCategories } from "@/lib/compliance";
 import { CATEGORIES, CATEGORY_BLURB, CATEGORY_LABEL, n } from "@/lib/format";
-import { brandsFor, COLLECTIONS, discover, orderBlock, toListings } from "@/lib/queries";
+import { brandsFor, COLLECTIONS, discover, listingBlock, toListings } from "@/lib/queries";
 import { getVisitor } from "@/lib/visitor";
+import { buyerPoint } from "@/lib/cart";
 
 export default async function Home() {
   const v = await getVisitor();
   const policy = v.policy;
-  const res = policy ? await discover(policy, v.near, { sort: "new" }) : null;
-  const listings = res ? toListings(res.products) : [];
+  const point = await buyerPoint();
+  const res = policy ? await discover(policy, point, { sort: "new" }) : null;
+  const listings = res ? toListings(res.products, point) : [];
   const fresh = listings.filter((l) => l.best?.stock !== "OUT").slice(0, 8);
   const brands = policy ? (await brandsFor(policy)).slice(0, 6) : [];
-  const stores = (res?.stores ?? []).slice(0, 3);
   const cats = policy ? allowedCategories(policy, CATEGORIES).filter((c) => c !== "ACCESSORY") : [];
   const showPrices = !!policy?.allows("retail.prices");
   const canOrder = !!policy?.allows("orders.online");
@@ -37,10 +37,9 @@ export default async function Home() {
         <div className="wrap hero">
           <div className="hero-copy">
             <span className="kicker">Licensed cannabis · {place}</span>
-            <h1 className="display">Every licensed store near you. <em>One simple cart.</em></h1>
+            <h1 className="display">Order it. <em>We find the store.</em></h1>
             <p className="lede">
-              See what each licensed store in {place} has on its shelves, compare prices, and
-              {canOrder ? ` order ahead for pickup${delivery ? " or delivery" : ""}. You pay the store when you collect, after a quick ID check.` : " find the store with what you want before you go."}
+              Every licensed shelf in {place}, in one place. Pick what you want — we send your order to the nearest licensed store that has it{delivery ? ", and it comes to your door" : ""}. Verify your ID once, then just order.
             </p>
             <form action="/shop" className="hero-search" role="search">
               <IconSearch aria-hidden />
@@ -58,12 +57,12 @@ export default async function Home() {
           <aside className="hero-card" aria-label="How Cairn works">
             <p className="kicker">How it works</p>
             <ol>
-              <li><span className="hc-n">1</span><div><p className="strong">Find it</p><p className="small">Search every licensed shelf in {place}. Same product at several stores? See them side by side.</p></div></li>
-              <li><span className="hc-n">2</span><div><p className="strong">{canOrder ? "Order from one store" : "Pick your store"}</p><p className="small">{canOrder ? "Fill your cart from the store you choose. It confirms and tells you when it's ready." : "Check stock and hours before you go."}</p></div></li>
-              <li><span className="hc-n">3</span><div><p className="strong">Show ID, pay, done</p><p className="small">The store checks your government ID and takes payment at handover.</p></div></li>
+              <li><span className="hc-n">1</span><div><p className="strong">Verify once</p><p className="small">Upload your ID one time. Then you can order wherever you are in {place} — even after you move.</p></div></li>
+              <li><span className="hc-n">2</span><div><p className="strong">Order what you see</p><p className="small">No store hunting. We route your order to the nearest licensed store that has it in stock.</p></div></li>
+              <li><span className="hc-n">3</span><div><p className="strong">It arrives</p><p className="small">The store delivers, checks your ID at the door, and you pay them. Done.</p></div></li>
             </ol>
             {open
-              ? <p className="hero-stat"><b className="num">{n(listings.length)}</b> products from <b className="num">{n(res!.stores.length)}</b> licensed {res!.stores.length === 1 ? "store" : "stores"}{v.near ? ` near ${v.near.label}` : ""}</p>
+              ? <p className="hero-stat"><b className="num">{n(listings.length)}</b> products from <b className="num">{n(res!.stores.length)}</b> licensed {res!.stores.length === 1 ? "store" : "stores"}{point ? ` around ${point.label}` : ""}</p>
               : <p className="hero-stat">Stores in {place} are joining now.</p>}
           </aside>
         </div>
@@ -73,8 +72,8 @@ export default async function Home() {
       <section className="promise-strip" aria-label="Why Cairn">
         <div className="wrap promise-grid">
           <div><IconShield aria-hidden /><p><b>Licensed stores only</b><span>Every store's provincial licence is checked by a person before it's listed.</span></p></div>
-          <div><IconSearch aria-hidden /><p><b>Compare before you buy</b><span>Prices, stock and THC/CBD from each store's own menu.</span></p></div>
-          <div><IconBag aria-hidden /><p><b>{canOrder ? `Pickup${delivery ? " or delivery" : ""}` : "Know before you go"}</b><span>{canOrder ? "Order ahead and skip the browsing at the counter." : "Live stock and opening hours for every location."}</span></p></div>
+          <div><IconSearch aria-hidden /><p><b>No store hunting</b><span>You order the product. We route it to the nearest licensed store that has it.</span></p></div>
+          <div><IconBag aria-hidden /><p><b>Verified once, order anywhere</b><span>Moved across town? Your next order goes to the store nearest your new address.</span></p></div>
           <div><IconCheck aria-hidden /><p><b>Nothing to pay online</b><span>You pay the store directly. Cairn never handles your money.</span></p></div>
         </div>
       </section>
@@ -99,6 +98,16 @@ export default async function Home() {
             </section>
           )}
 
+          {!point && (
+            <section className="wrap" style={{ paddingTop: 8 }}>
+              <div className="near-callout">
+                <IconPin aria-hidden />
+                <p><b>Where should we deliver?</b> Add your postal code to see exact prices and what delivers to you.</p>
+                <NearControl label={null} next="/" compact />
+              </div>
+            </section>
+          )}
+
           {fresh.length > 0 && (
             <section className="wrap sec" aria-labelledby="new">
               <div className="section-head">
@@ -107,27 +116,10 @@ export default async function Home() {
               </div>
               <div className="pgrid">
                 {fresh.map((p) => (
-                  <ProductCard key={p.id} p={p} store={{ name: p.retailer.tradeName, slug: p.retailer.slug }} showPrice={showPrices}
-                    orderable={orderBlock(policy!, p.retailer)} stock={p.best?.stock} distance={p.best?.distance} />
+                  <ProductCard key={p.id} p={p} showPrice={showPrices} deliverable={p.deliverable}
+                    orderable={listingBlock(policy!, p.orderable)} stock={p.best?.stock} />
                 ))}
               </div>
-            </section>
-          )}
-
-          {stores.length > 0 && (
-            <section className="wrap sec" aria-labelledby="stores">
-              <div className="section-head">
-                <div><span className="kicker">Licensed &amp; verified</span><h2 id="stores" className="h2">{v.near ? `Stores near ${v.near.label}` : `Stores in ${place}`}</h2></div>
-                <Link href="/stores">All stores</Link>
-              </div>
-              {!v.near && (
-                <div className="near-callout">
-                  <IconPin aria-hidden />
-                  <p><b>See what's closest.</b> Add your postal code to sort stores and products by distance.</p>
-                  <NearControl label={null} next="/" compact />
-                </div>
-              )}
-              <div className="store-grid">{stores.map((r) => <StoreCard key={r.id} r={r} policy={policy!} />)}</div>
             </section>
           )}
 
@@ -197,8 +189,8 @@ export default async function Home() {
           <Link href="/how-it-works">How we check stores</Link>
         </div>
         <ol className="steps">
-          <li><p className="h4">One store per order</p><p className="small muted">Compare offers, then fill your cart from the store you choose. That way it's prepared and handed over in one go.</p></li>
-          <li><p className="h4">The store confirms</p><p className="small muted">You get a notification when the store accepts, when it's being prepared, and when it's ready{delivery ? " or on its way" : ""}.</p></li>
+          <li><p className="h4">We route it</p><p className="small muted">Your order goes to the nearest licensed store with everything in stock. If one store can't do it all, it comes in parts — we tell you before you pay.</p></li>
+          <li><p className="h4">The store confirms</p><p className="small muted">You're notified when it's accepted, being prepared, and on its way. If a store can't fill it, we pass it to the next one automatically.</p></li>
           <li><p className="h4">ID, then payment</p><p className="small muted">Bring valid government photo ID{policy ? ` showing you're ${policy.legalAge} or older` : ""}. The store checks it and takes payment at handover.</p></li>
         </ol>
       </section>

@@ -5,10 +5,11 @@ import { requireRole } from "@/lib/auth/session";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await requireRole("ADMIN", "/admin");
-  const [[{ c: lic }], [{ c: par }], [{ c: risk }]] = await Promise.all([
+  const [[{ c: lic }], [{ c: par }], [{ c: risk }], [{ c: ids }]] = await Promise.all([
     db.select({ c: count() }).from(schema.licences).where(eq(schema.licences.status, "PENDING")),
     db.select({ c: count() }).from(schema.partners).where(sql`${schema.partners.status} in ('APPLIED','UNDER_REVIEW')`),
     db.select({ c: count() }).from(schema.riskFlags).where(eq(schema.riskFlags.status, "OPEN")),
+    db.select({ c: count() }).from(schema.users).where(eq(schema.users.idStatus, "PENDING")),
   ]);
   return (
     <ConsoleShell
@@ -17,7 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       groups={[
         { items: [{ href: "/admin", label: "Overview", exact: true }] },
         { label: "Review", items: [
-          { href: "/admin/verification", label: "Verification queue", count: lic + par },
+          { href: "/admin/verification", label: "Verification queue", count: lic + par + ids },
           { href: "/admin/risk", label: "Risk and reports", count: risk },
         ] },
         { label: "Ecosystem", items: [

@@ -28,7 +28,7 @@ export async function SiteHeader({ path }: { path: string }) {
       <a className="skip" href="#main">Skip to content</a>
       <div className="utility">
         <div className="wrap">
-          <span className="promise"><span>Licensed stores only</span><span>Compare prices across stores</span><span>Pay the store at pickup or delivery</span></span>
+          <span className="promise"><span>Licensed stores only</span><span>Verify once, order anywhere</span><span>Pay the store at pickup or delivery</span></span>
           <span className="grow" />
           {v.policy && <span className="show-sm">{v.user ? <Link href="/account/settings">{v.policy.name} · {v.policy.legalAge}+</Link> : <ChangeRegionButton className="" label={`${v.policy.name} · ${v.policy.legalAge}+`} />}</span>}
           <Link href="/guide" className="hide-sm">New to cannabis?</Link>
@@ -72,7 +72,6 @@ export async function SiteHeader({ path }: { path: string }) {
                 { href: "/shop", label: "Shop all" },
                 ...cats.map((c) => ({ href: `/shop?category=${c}`, label: CATEGORY_LABEL[c] })),
                 { href: "/brands", label: "Brands" },
-                { href: "/stores", label: "Stores" },
                 { href: "/guide", label: "Guide" },
               ]} />
             </div>

@@ -25,6 +25,12 @@ export default async function Account({ searchParams }: { searchParams: Promise<
         <h1 className="h1">{u.name}</h1>
         <p className="muted">{u.email}, {policy.name}</p>
       </div>
+      {u.idStatus !== "VERIFIED" ? (
+        <Link href="/account/verify" className="callout signal" style={{ display: "block", textDecoration: "none", color: "inherit" }}>
+          <p className="strong">{u.idStatus === "PENDING" ? "Your ID is being checked" : u.idStatus === "REJECTED" ? "Your ID needs another try" : "Verify your ID to start ordering"}</p>
+          <p className="small muted">{u.idStatus === "PENDING" ? "We'll notify you as soon as it's done." : "A one-time check. Then you can order anywhere Cairn delivers."}</p>
+        </Link>
+      ) : <p className="status ok">ID verified — you can order anywhere Cairn delivers</p>}
       <dl className="metrics">
         <div className="metric"><dt>Orders</dt><dd><Link href="/orders">View</Link></dd><p className="delta">Track and review your orders</p></div>
         <div className="metric"><dt>Saved</dt><dd>{saved}</dd><p className="delta"><Link href="/account/saved">View saved</Link></p></div>

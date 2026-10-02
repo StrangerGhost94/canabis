@@ -1,5 +1,5 @@
 "use client";
-import { resolveRisk, reviewLicence, reviewPartner, runLicenceSweep, setPartnerStatus, setRetailerStatus, updateRule } from "@/app/actions/admin";
+import { resolveRisk, reviewBuyer, reviewLicence, reviewPartner, runLicenceSweep, setPartnerStatus, setRetailerStatus, updateRule } from "@/app/actions/admin";
 import { ActionForm, Field, Input, Submit } from "../form";
 
 export function LicenceReviewForm({ licenceId }: { licenceId: string }) {
@@ -106,6 +106,26 @@ export function SweepForm() {
   return (
     <ActionForm action={runLicenceSweep} className="stack">
       {() => <div><Submit className="btn" pending="Checking…">Run licence check now</Submit></div>}
+    </ActionForm>
+  );
+}
+
+export function BuyerReviewForm({ userId, legalAge }: { userId: string; legalAge: number }) {
+  return (
+    <ActionForm action={reviewBuyer} className="form">
+      {(s) => (
+        <>
+          <input type="hidden" name="userId" value={userId} />
+          <label className="check"><input type="checkbox" name="matches" value="yes" /><span>The photo ID is genuine, the selfie matches it, the name matches the account, and the date of birth shows {legalAge}+.</span></label>
+          {s?.fields?.matches && <p className="err">{s.fields.matches}</p>}
+          <Field name="notes" label="Note to buyer" hint="Required when rejecting, e.g. 'Photo too blurry — retake in good light.'" state={s}><textarea id="notes" name="notes" className="textarea" style={{ minHeight: 70 }} /></Field>
+          <div className="row">
+            <Submit name="decision" value="VERIFIED" className="btn primary" pending="Saving…">Verify buyer</Submit>
+            <Submit name="decision" value="REJECTED" className="btn danger" pending="Saving…">Reject</Submit>
+          </div>
+          <p className="xs muted">Either way, both images are deleted immediately after you decide.</p>
+        </>
+      )}
     </ActionForm>
   );
 }

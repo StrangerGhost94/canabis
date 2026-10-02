@@ -5,6 +5,7 @@ import { db, schema } from "@/db";
 import { allowedCategories, type Policy } from "./compliance";
 import { CATEGORIES, profile as ratioProfile } from "./format";
 import { km, openState } from "./geo";
+import { routedOffer } from "./routing";
 import { trustFor } from "./verification/trust";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -196,21 +197,31 @@ export function orderBlock(policy: { allows: (k: "orders.online") => boolean; na
 }
 
 
+/** Why a listing can't go in the cart, or null if it can. */
+export function listingBlock(policy: { allows: (k: "orders.online") => boolean; name: string }, orderable: boolean) {
+  if (!policy.allows("orders.online")) return `Ordering through Cairn isn't available in ${policy.name} yet.`;
+  if (!orderable) return "Not available to order online right now.";
+  return null;
+}
+
 /**
  * The marketplace view: the same product (brand + name + size) sold by several
- * stores becomes one listing. The lead offer is the first in the caller's sort
- * that is in stock; the rest are competing offers.
+ * stores becomes one listing. The lead offer is the one this buyer would
+ * actually get — the nearest store that delivers to them with it in stock —
+ * so the price on the card is the price they pay.
  */
-export function toListings<T extends { id: string; brand: string; name: string; size: string; priceCents: number; retailerId: string; best?: { stock: string } | undefined }>(products: T[]) {
+export function toListings<T extends { id: string; brand: string; name: string; size: string; priceCents: number; retailerId: string; inventory: { locationId: string; status: string }[]; retailer: Awaited<ReturnType<typeof listedRetailers>>[number]; best?: { stock: string } | undefined }>(products: T[], point: { lat: number; lng: number } | null = null) {
   const groups = new Map<string, T[]>();
   for (const p of products) {
     const key = `${p.brand}|${p.name}|${p.size}`.toLowerCase();
     groups.set(key, [...(groups.get(key) ?? []), p]);
   }
   return [...groups.values()].map((offers) => {
-    const lead = offers.find((o) => o.best?.stock !== "OUT") ?? offers[0];
+    const retailers = new Map(offers.map((o) => [o.retailerId, o.retailer]));
+    const routed = routedOffer(offers, retailers, point);
+    const lead = routed?.offer ?? offers.find((o) => o.best?.stock !== "OUT") ?? offers[0];
     const stores = new Set(offers.map((o) => o.retailerId)).size;
-    return { ...lead, offerCount: stores, minPriceCents: Math.min(...offers.map((o) => o.priceCents)) };
+    return { ...lead, offerCount: stores, minPriceCents: Math.min(...offers.map((o) => o.priceCents)), deliverable: point ? !!routed?.deliverable : null, orderable: !!routed };
   });
 }
 

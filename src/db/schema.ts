@@ -50,6 +50,10 @@ export const commissionStatus = pgEnum("commission_status", [
   "NOT_APPLICABLE", "PENDING", "APPROVED", "WITHHELD", "PAID",
 ]);
 export const fulfilmentEnum = pgEnum("fulfilment", ["PICKUP", "DELIVERY"]);
+export const buyerIdStatus = pgEnum("buyer_id_status", ["NONE", "PENDING", "VERIFIED", "REJECTED"]);
+
+/** A buyer's saved delivery address, geocoded once so orders can be routed to the nearest store. */
+export type SavedAddress = { street: string; unit?: string; city: string; postalCode: string; lat: number; lng: number; label: string };
 export const orderStatus = pgEnum("order_status", [
   "PLACED", // waiting on the store
   "ACCEPTED", // store is preparing it
@@ -100,6 +104,13 @@ export const users = pgTable("users", {
   jurisdictionCode: text("jurisdiction_code").notNull().references(() => jurisdictions.code),
   roles: roleEnum("roles").array().notNull().default(sql`ARRAY['CUSTOMER']::role[]`),
   status: accountStatus("status").notNull().default("ACTIVE"),
+  /** Buyer ID verification: a reviewer has matched a government photo ID and selfie to this account. */
+  idStatus: buyerIdStatus("id_status").notNull().default("NONE"),
+  idSubmittedAt: ts("id_submitted_at"),
+  idReviewedAt: ts("id_reviewed_at"),
+  idReviewedById: text("id_reviewed_by_id"),
+  idReviewNotes: text("id_review_notes"),
+  address: jsonb("address").$type<SavedAddress | null>(),
   isDemo: boolean("is_demo").notNull().default(false),
   createdAt: created(),
   updatedAt: updated(),
@@ -197,6 +208,8 @@ export const documents = pgTable("documents", {
   uploadedById: text("uploaded_by_id").notNull(),
   licenceId: text("licence_id").references(() => licences.id, { onDelete: "cascade" }),
   partnerId: text("partner_id"),
+  /** Buyer ID documents: the account being verified. Deleted once a reviewer decides. */
+  subjectUserId: text("subject_user_id").references(() => users.id, { onDelete: "cascade" }),
   createdAt: created(),
 });
 
@@ -251,6 +264,7 @@ export const carts = pgTable("carts", {
   userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
   retailerId: text("retailer_id").references(() => retailers.id, { onDelete: "set null" }),
   locationId: text("location_id").references(() => locations.id, { onDelete: "set null" }),
+  fulfilment: fulfilmentEnum("fulfilment").notNull().default("DELIVERY"),
   createdAt: created(),
   updatedAt: updated(),
 }, (t) => [index("cart_user").on(t.userId)]);
@@ -281,7 +295,9 @@ export const orders = pgTable("orders", {
   equivalentGrams: doublePrecision("equivalent_grams").notNull(),
   contactName: text("contact_name").notNull(),
   contactPhone: text("contact_phone").notNull(),
-  deliveryAddress: jsonb("delivery_address").$type<{ street: string; unit?: string; city: string; postalCode: string } | null>(),
+  deliveryAddress: jsonb("delivery_address").$type<{ street: string; unit?: string; city: string; postalCode: string; lat?: number; lng?: number } | null>(),
+  /** Stores that declined this order; routing never sends it back to them. */
+  routingExcluded: text("routing_excluded").array().notNull().default(sql`'{}'::text[]`),
   notes: text("notes"),
   readyBy: ts("ready_by"),
   cancelReason: text("cancel_reason"),
@@ -488,6 +504,7 @@ export const licenceRelations = relations(licences, ({ one, many }) => ({
 }));
 export const documentRelations = relations(documents, ({ one }) => ({
   licence: one(licences, { fields: [documents.licenceId], references: [licences.id] }),
+  subject: one(users, { fields: [documents.subjectUserId], references: [users.id] }),
 }));
 export const productRelations = relations(products, ({ one, many }) => ({
   retailer: one(retailers, { fields: [products.retailerId], references: [retailers.id] }),

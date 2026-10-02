@@ -81,7 +81,7 @@ export async function signUp(_: ActionState, form: FormData): Promise<ActionStat
     }).returning({ id: schema.users.id });
     await createSession(user.id);
     await audit({ actorId: user.id, action: "auth.sign_up", targetType: "user", targetId: user.id, metadata: { intent: d.intent, admin: roles.includes("ADMIN") } });
-    dest = d.intent === "RETAILER" ? "/retailer/onboarding" : d.intent === "PARTNER" ? "/partners/apply" : safeNext(form.get("next"));
+    dest = d.intent === "RETAILER" ? "/retailer/onboarding" : d.intent === "PARTNER" ? "/partners/apply" : `/account/verify?next=${encodeURIComponent(safeNext(form.get("next")))}`;
   } catch (e) {
     return fail(e, form);
   }

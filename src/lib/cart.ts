@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { cache } from "react";
 import { db, schema } from "@/db";
@@ -9,6 +9,8 @@ import { isProd } from "./env";
 import { CATEGORIES } from "./format";
 import { getSession } from "./auth/session";
 import { listedRetailers } from "./queries";
+import { listingKey, planRoute } from "./routing";
+import { getVisitor } from "./visitor";
 
 export const CART_COOKIE = "cairn_cart";
 /** Federal public-possession limit, in grams of dried cannabis or equivalent. */
@@ -58,35 +60,50 @@ async function ensureCart() {
 
 export type CartView = NonNullable<Awaited<ReturnType<typeof getCart>>>;
 
-/** The cart with live product, stock and store data, and a list of anything that blocks checkout. */
+/** Where this buyer receives orders: their saved address, else the area they set while browsing. */
+export async function buyerPoint() {
+  const s = await getSession();
+  if (s?.user.address) return { lat: s.user.address.lat, lng: s.user.address.lng, label: s.user.address.label, saved: true };
+  const v = await getVisitor();
+  return v.near ? { lat: v.near.lat, lng: v.near.lng, label: v.near.label, saved: false } : null;
+}
+
+/**
+ * The cart, routed. Items are listings (brand + name + size), not tied to a
+ * store; the plan says which licensed store will fill each one for this buyer.
+ */
 export const getCart = cache(async () => {
   const id = await getCartId();
   if (!id) return null;
   const cart = await db.query.carts.findFirst({
     where: eq(schema.carts.id, id),
-    with: { items: { with: { product: { with: { inventory: true } } }, orderBy: (i, { asc }) => asc(i.addedAt) }, retailer: { with: { locations: true } } },
+    with: { items: { with: { product: { with: { retailer: { columns: { jurisdictionCode: true } } } } }, orderBy: (i, { asc }) => asc(i.addedAt) } },
   });
-  if (!cart || !cart.retailer || cart.items.length === 0) return cart ? { ...cart, lines: [], subtotalCents: 0, grams: 0, count: 0, problems: [] as string[], listed: null, location: null } : null;
-
-  const listed = (await listedRetailers(cart.retailer.jurisdictionCode)).find((r) => r.id === cart.retailerId) ?? null;
-  const location = cart.retailer.locations.find((l) => l.id === cart.locationId && l.active) ?? cart.retailer.locations.find((l) => l.active) ?? null;
-  const lines = cart.items.map((i) => {
-    const stock = i.product.inventory.find((x) => x.locationId === location?.id)?.status ?? "OUT";
-    const available = i.product.status === "ACTIVE" && stock !== "OUT";
-    return { ...i, stock, available, lineCents: i.product.priceCents * i.quantity, grams: i.product.equivalentGrams * i.quantity };
-  });
-  const subtotalCents = lines.filter((l) => l.available).reduce((a, l) => a + l.lineCents, 0);
-  const grams = lines.filter((l) => l.available).reduce((a, l) => a + l.grams, 0);
+  if (!cart) return null;
+  const v = await getVisitor();
+  const jur = v.region ?? cart.items[0]?.product.retailer.jurisdictionCode ?? null;
+  const point = await buyerPoint();
+  const lines = cart.items.map((i) => ({ ...i, key: listingKey(i.product) }));
+  const base = { ...cart, lines, count: lines.reduce((a, l) => a + l.quantity, 0), point, jurisdictionCode: jur };
+  if (!lines.length || !jur) {
+    return { ...base, plan: null, subtotalCents: 0, feeCents: 0, totalCents: 0, grams: 0, problems: [] as string[], canCheckout: false };
+  }
+  const plan = await planRoute({ jurisdictionCode: jur, point, fulfilment: cart.fulfilment, lines: lines.map((l) => ({ key: l.key, quantity: l.quantity })) });
+  const subtotalCents = plan.shipments.reduce((a, x) => a + x.subtotalCents, 0);
+  const feeCents = plan.shipments.reduce((a, x) => a + x.feeCents, 0);
+  const grams = plan.shipments.reduce((a, x) => a + x.grams, 0);
   const problems: string[] = [];
-  if (!listed) problems.push(`${cart.retailer.tradeName} isn't taking orders on Cairn right now.`);
-  if (lines.some((l) => !l.available)) problems.push(`Some items aren't available at ${location?.name ?? "this location"}. They won't be included.`);
+  if (plan.blocked) problems.push(plan.blocked);
+  if (plan.unavailable.length && !plan.blocked) problems.push(`${plan.unavailable.length === 1 ? "One item isn't" : `${plan.unavailable.length} items aren't`} available ${cart.fulfilment === "DELIVERY" ? "for delivery to you" : "for pickup near you"} right now. ${plan.unavailable.length === 1 ? "It" : "They"} won't be included.`);
+  for (const sh of plan.shipments) if (sh.problem) problems.push(sh.problem);
   if (grams > POSSESSION_LIMIT_G) problems.push(`This order is ${round(grams)} g of dried-cannabis equivalent. The legal limit you can carry in public is ${POSSESSION_LIMIT_G} g.`);
-  return { ...cart, lines, subtotalCents, grams, count: lines.reduce((a, l) => a + l.quantity, 0), problems, listed, location };
+  const canCheckout = plan.shipments.length > 0 && !plan.shipments.some((x) => x.problem) && grams <= POSSESSION_LIMIT_G;
+  return { ...base, plan, subtotalCents, feeCents, totalCents: subtotalCents + feeCents, grams, problems, canCheckout };
 });
 
 export const round = (g: number) => (Math.round(g * 10) / 10).toString();
 
-/** Checks a product can be ordered by this shopper at all. */
+/** Checks a listing can be ordered by this shopper at all. */
 async function orderableProduct(productId: string) {
   const p = await db.query.products.findFirst({ where: and(eq(schema.products.id, productId), eq(schema.products.status, "ACTIVE")), with: { retailer: true } });
   if (!p) throw new UserFacingError("That product isn't available any more.");
@@ -94,35 +111,33 @@ async function orderableProduct(productId: string) {
   if (!policy.allows("orders.online")) throw new UserFacingError(policy.offMessage("orders.online"));
   const rule = RESTRICTED_CATEGORY_RULE[p.category];
   if ((rule && !policy.allows(rule)) || !allowedCategories(policy, CATEGORIES).includes(p.category)) throw new UserFacingError("That product can't be ordered here.");
-  const listed = (await listedRetailers(p.retailer.jurisdictionCode)).find((r) => r.id === p.retailerId);
-  if (!listed || !p.retailer.acceptsOrders) throw new UserFacingError(`${p.retailer.tradeName} isn't taking orders on Cairn right now.`);
-  return { p, listed };
+  const listed = await listedRetailers(p.retailer.jurisdictionCode);
+  if (!listed.some((r) => r.acceptsOrders)) throw new UserFacingError(`Ordering isn't open in ${policy.name} yet.`);
+  return { p };
 }
 
-export type AddResult = { ok: true; count: number } | { ok: false; conflict: { current: string; next: string } } | { ok: false; error: string };
+export type AddResult = { ok: true; count: number } | { ok: false; error: string };
 
-export async function addToCart(productId: string, quantity: number, opts: { replace?: boolean; locationId?: string } = {}): Promise<AddResult> {
-  const { p, listed } = await orderableProduct(productId);
-  const s = await getSession();
-  if (s && s.user.jurisdictionCode !== p.retailer.jurisdictionCode) {
-    return { ok: false, error: `This store is outside ${s.user.jurisdictionCode}. You can only order from stores in your own province or territory.` };
+export async function addToCart(productId: string, quantity: number): Promise<AddResult> {
+  const { p } = await orderableProduct(productId);
+  const v = await getVisitor();
+  const region = v.user?.jurisdictionCode ?? v.region;
+  if (region && region !== p.retailer.jurisdictionCode) {
+    return { ok: false, error: "That product is sold in another province. You can only order where you live." };
   }
   const cartId = await ensureCart();
-  const cart = await db.query.carts.findFirst({ where: eq(schema.carts.id, cartId), with: { items: { with: { product: true } }, retailer: true } });
-  if (cart!.items.length && cart!.retailerId && cart!.retailerId !== p.retailerId) {
-    if (!opts.replace) return { ok: false, conflict: { current: cart!.retailer!.tradeName, next: p.retailer.tradeName } };
-    await db.delete(schema.cartItems).where(eq(schema.cartItems.cartId, cartId));
-    cart!.items = [];
-  }
-  const existing = cart!.items.find((i) => i.productId === productId);
+  const cart = await db.query.carts.findFirst({ where: eq(schema.carts.id, cartId), with: { items: { with: { product: true } } } });
+  const key = listingKey(p);
+  // The same listing from another store is the same line.
+  const existing = cart!.items.find((i) => listingKey(i.product) === key);
+  const lineProductId = existing?.productId ?? productId;
   const qty = Math.min(MAX_PER_ITEM, (existing?.quantity ?? 0) + quantity);
-  const others = cart!.items.filter((i) => i.productId !== productId).reduce((a, i) => a + i.product.equivalentGrams * i.quantity, 0);
+  const others = cart!.items.filter((i) => i.productId !== lineProductId).reduce((a, i) => a + i.product.equivalentGrams * i.quantity, 0);
   if (others + p.equivalentGrams * qty > POSSESSION_LIMIT_G) {
     return { ok: false, error: `Adding this would take your order over the ${POSSESSION_LIMIT_G} g public-possession limit.` };
   }
-  const locationId = opts.locationId && listed.locations.some((l) => l.id === opts.locationId) ? opts.locationId : cart!.retailerId === p.retailerId ? cart!.locationId : listed.locations[0]?.id;
-  await db.update(schema.carts).set({ retailerId: p.retailerId, locationId: locationId ?? null, updatedAt: new Date() }).where(eq(schema.carts.id, cartId));
-  await db.insert(schema.cartItems).values({ cartId, productId, quantity: qty })
+  await db.update(schema.carts).set({ updatedAt: new Date() }).where(eq(schema.carts.id, cartId));
+  await db.insert(schema.cartItems).values({ cartId, productId: lineProductId, quantity: qty })
     .onConflictDoUpdate({ target: [schema.cartItems.cartId, schema.cartItems.productId], set: { quantity: qty } });
   const all = await db.query.cartItems.findMany({ where: eq(schema.cartItems.cartId, cartId) });
   return { ok: true, count: all.reduce((a, i) => a + i.quantity, 0) };
@@ -145,17 +160,14 @@ export async function setQuantity(productId: string, quantity: number) {
   await db.update(schema.carts).set({ updatedAt: new Date() }).where(eq(schema.carts.id, cartId));
 }
 
-export async function setCartLocation(locationId: string) {
-  const cartId = await getCartId();
-  if (!cartId) return;
-  const cart = await db.query.carts.findFirst({ where: eq(schema.carts.id, cartId) });
-  const loc = await db.query.locations.findFirst({ where: and(eq(schema.locations.id, locationId), eq(schema.locations.active, true)) });
-  if (!loc || loc.retailerId !== cart?.retailerId) throw new UserFacingError("Choose one of this store's locations.");
-  await db.update(schema.carts).set({ locationId }).where(eq(schema.carts.id, cartId));
+export async function setFulfilment(f: "DELIVERY" | "PICKUP") {
+  const cartId = await ensureCart();
+  await db.update(schema.carts).set({ fulfilment: f, updatedAt: new Date() }).where(eq(schema.carts.id, cartId));
 }
 
-export async function clearCart(cartId: string) {
-  await db.delete(schema.cartItems).where(eq(schema.cartItems.cartId, cartId));
+export async function clearCart(cartId: string, productIds?: string[]) {
+  if (productIds) await db.delete(schema.cartItems).where(and(eq(schema.cartItems.cartId, cartId), inArray(schema.cartItems.productId, productIds)));
+  else await db.delete(schema.cartItems).where(eq(schema.cartItems.cartId, cartId));
   await db.update(schema.carts).set({ retailerId: null, locationId: null }).where(eq(schema.carts.id, cartId));
 }
 

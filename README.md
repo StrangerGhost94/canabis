@@ -43,7 +43,14 @@ Production: `npm run build && npm start` (start runs migrations and the seed, bo
 
 **Admins** — overview, verification queue (licences and partners), retailers/partners/users/products enforcement, referrals and commission approval, jurisdiction rules matrix, risk flags and public reports, audit log, system/provider status and licence sweep.
 
-## Ordering model
+## Ordering model (products first, automatic routing)
+- **Buyers verify once.** After sign-up they upload a government photo ID and a selfie (`/account/verify`). An admin approves it in **Admin → Verification queue → Buyer IDs**; both images are deleted as soon as a decision is made. Only verified buyers can check out. Stores still check ID at the door, as the law requires.
+- **Buyers never pick a store.** The cart holds products (brand + name + size). At checkout `src/lib/routing.ts` sends each item to the nearest licensed store that has it in stock and delivers to the buyer's address (or offers pickup), splitting into as few parts as possible when no single store has everything. Prices on cards and product pages are the routed store's price for that buyer.
+- **Moving is automatic.** The saved delivery address (Account → Settings) drives routing, so a new address means the nearest stores there. Changing province clears the address and re-applies that province's rules.
+- **Declines reroute.** If a store declines, the order moves to the next-nearest store that can fill all of it; the buyer is told the new store and total and can cancel before acceptance.
+- The seller is always named at checkout and on every order (trade name, legal name, regulator and licence number).
+
+## Ordering model (details)
 - `src/lib/cart.ts` — one cart per browser or user, one store per cart (asks before replacing), quantity caps, and the federal **30 g public-possession limit** computed from each product's label equivalent.
 - `src/lib/orders.ts` — order placement and a strict state machine: `PLACED → ACCEPTED → READY | OUT_FOR_DELIVERY → COMPLETED`, with `REJECTED`/`CANCELLED` exits. Only the store can advance an order; the customer can cancel only before acceptance; completion requires the store to confirm an ID check. Every step is timestamped, audit-logged and notified.
 - Delivery postal codes must be in the store's province. Customers can only order from stores in their own province.

@@ -4,15 +4,15 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { fail, type ActionState, UserFacingError } from "@/lib/actions/result";
 import { requireUser } from "@/lib/auth/session";
-import { addToCart, setCartLocation, setQuantity, type AddResult } from "@/lib/cart";
+import { addToCart, setFulfilment, setQuantity, type AddResult } from "@/lib/cart";
 import { placeOrder, transitionOrder } from "@/lib/orders";
 import { rateLimit } from "@/lib/rate-limit";
 import { clientIpHash } from "@/lib/request";
 
-export async function addToCartAction(productId: string, quantity = 1, replace = false, locationId?: string): Promise<AddResult> {
+export async function addToCartAction(productId: string, quantity = 1): Promise<AddResult> {
   try {
     await rateLimit(`cart:${await clientIpHash()}`, 120, 60);
-    const res = await addToCart(z.string().min(1).max(64).parse(productId), z.number().int().min(1).max(10).parse(quantity), { replace, locationId });
+    const res = await addToCart(z.string().min(1).max(64).parse(productId), z.number().int().min(1).max(10).parse(quantity));
     revalidatePath("/", "layout");
     return res;
   } catch (e) {
@@ -26,9 +26,11 @@ export async function updateCartLine(form: FormData) {
   revalidatePath("/", "layout");
 }
 
-export async function chooseCartLocation(form: FormData) {
-  await setCartLocation(String(form.get("locationId")));
+export async function chooseFulfilment(form: FormData) {
+  const f = form.get("fulfilment") === "PICKUP" ? "PICKUP" : "DELIVERY";
+  await setFulfilment(f);
   revalidatePath("/cart");
+  revalidatePath("/checkout");
 }
 
 const Phone = z.string().trim().regex(/^[0-9 ()+.-]{10,20}$/, "Enter a phone number the store can reach you on.");
@@ -51,8 +53,8 @@ export async function checkout(_: ActionState, form: FormData): Promise<ActionSt
       city: z.string().trim().min(2, "Enter the city.").max(60),
       postalCode: z.string().trim().toUpperCase().regex(/^[A-Z]\d[A-Z] ?\d[A-Z]\d$/, "Enter a postal code like M4M 2Y6."),
     }).parse({ street: form.get("street"), unit: form.get("unit") || undefined, city: form.get("city"), postalCode: form.get("postalCode") }) : undefined;
-    const order = await placeOrder(user, { ...base, address });
-    dest = `/orders/${order.id}?placed=1`;
+    const orders = await placeOrder(user, { ...base, address });
+    dest = orders.length === 1 ? `/orders/${orders[0].id}?placed=1` : `/orders?placed=${orders.length}`;
   } catch (e) {
     return fail(e, form);
   }
