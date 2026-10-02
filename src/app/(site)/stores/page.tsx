@@ -1,3 +1,4 @@
+import { requireUser } from "@/lib/auth/session";
 import { Locator } from "@/components/discover/locator";
 import { NearControl } from "@/components/discover/near-form";
 import { StoreCard } from "@/components/store-card";
@@ -7,6 +8,7 @@ import { getVisitor } from "@/lib/visitor";
 export const metadata = { title: "Stores" };
 
 export default async function Stores() {
+  await requireUser("/stores");
   const v = await getVisitor();
   if (!v.policy) return <div className="wrap section"><p className="muted">Choose your province or territory to start.</p></div>;
   const { stores, blocked } = await discover(v.policy, v.near, { view: "stores" });

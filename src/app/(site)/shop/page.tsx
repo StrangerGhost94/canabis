@@ -1,3 +1,4 @@
+import { requireUser } from "@/lib/auth/session";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Filters } from "@/components/discover/filters";
@@ -12,6 +13,7 @@ import { getVisitor } from "@/lib/visitor";
 export const metadata = { title: "Shop" };
 
 export default async function Shop({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await requireUser("/shop");
   const sp = await searchParams;
   const p = parseDiscover(sp);
   const v = await getVisitor();

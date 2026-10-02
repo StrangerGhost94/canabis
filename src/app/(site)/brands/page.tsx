@@ -1,3 +1,4 @@
+import { requireUser } from "@/lib/auth/session";
 import Link from "next/link";
 import { PackArt } from "@/components/pack-art";
 import { CATEGORY_LABEL } from "@/lib/format";
@@ -7,6 +8,7 @@ import { getVisitor } from "@/lib/visitor";
 export const metadata = { title: "Brands" };
 
 export default async function Brands() {
+  await requireUser("/brands");
   const v = await getVisitor();
   if (!v.policy) return <div className="wrap section"><p className="muted">Choose your province or territory to start.</p></div>;
   const brands = await brandsFor(v.policy);

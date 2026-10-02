@@ -286,7 +286,7 @@ tbody tr:hover { background: var(--hover); }
 @media (max-width: 760px) {
   .nav, .hide-sm { display: none !important; }
   .topbar-inner { min-height: 54px; gap: var(--s3); }
-  .site { padding-bottom: calc(64px + var(--safe-b)); }
+  .site.has-nav { padding-bottom: calc(64px + var(--safe-b)); }
   .bottom-nav {
     display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; inset: auto 0 0 0; z-index: 45;
     background: var(--surface); border-top: 1px solid var(--rule); padding-bottom: var(--safe-b);

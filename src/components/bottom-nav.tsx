@@ -10,8 +10,8 @@ export function BottomNav({ signedIn, cartItems }: { signedIn: boolean; cartItem
     { href: "/", label: "Home", icon: IconHome, match: (p: string) => p === "/" },
     { href: "/shop", label: "Shop", icon: IconSearch, match: (p: string) => p.startsWith("/shop") || p.startsWith("/stores") || p.startsWith("/products") },
     { href: "/cart", label: "Cart", icon: IconBag, match: (p: string) => p.startsWith("/cart") || p.startsWith("/checkout"), badge: cartItems },
-    { href: signedIn ? "/orders" : "/sign-in?next=/orders", label: "Orders", icon: IconReceipt, match: (p: string) => p.startsWith("/orders") },
-    { href: signedIn ? "/account" : "/sign-in", label: signedIn ? "Account" : "Sign in", icon: IconUser, match: (p: string) => p.startsWith("/account") || p.startsWith("/sign-") },
+    { href: "/orders", label: "Orders", icon: IconReceipt, match: (p: string) => p.startsWith("/orders") },
+    { href: "/account", label: "Account", icon: IconUser, match: (p: string) => p.startsWith("/account") },
   ];
   return (
     <nav className="bottom-nav" aria-label="Primary">

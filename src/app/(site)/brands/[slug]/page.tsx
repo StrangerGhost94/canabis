@@ -1,3 +1,4 @@
+import { requireUser } from "@/lib/auth/session";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProductCard } from "@/components/product-card";
@@ -7,6 +8,7 @@ import { buyerPoint } from "@/lib/cart";
 import { getVisitor } from "@/lib/visitor";
 
 export default async function Brand({ params }: { params: Promise<{ slug: string }> }) {
+  await requireUser(`/brands/${(await params).slug}`);
   const { slug } = await params;
   const v = await getVisitor();
   if (!v.policy) return <div className="wrap section"><p className="muted">Choose your province or territory to start.</p></div>;

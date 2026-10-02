@@ -85,7 +85,7 @@ export default async function Home() {
         </ol>
       </section>
 
-      {open && cats.length > 0 && (
+      {user && open && cats.length > 0 && (
         <section className="wrap cats-sec" aria-labelledby="cats-h">
           <div className="row between mb-3"><h2 id="cats-h" className="h2">What are you after?</h2><Link href="/shop" className="btn sm">See everything</Link></div>
           <div className="cat-tiles">

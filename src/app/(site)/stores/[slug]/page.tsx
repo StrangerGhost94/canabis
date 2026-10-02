@@ -1,3 +1,4 @@
+import { requireUser } from "@/lib/auth/session";
 import { and, eq } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -20,6 +21,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 export default async function StorePage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ loc?: string; category?: string }> }) {
+  await requireUser(`/stores/${(await params).slug}`);
   const { slug } = await params;
   const sp = await searchParams;
   const r = await storeBySlug(slug);

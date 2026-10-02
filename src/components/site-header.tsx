@@ -23,7 +23,7 @@ export async function SiteHeader({ path }: { path: string }) {
 
   const firstName = v.user?.name.split(" ")[0];
 
-  const shopping = path.startsWith("/shop") || path.startsWith("/products") || path.startsWith("/brands");
+  const shopping = !!v.user && path.startsWith("/shop") || path.startsWith("/products") || path.startsWith("/brands");
 
   return (
     <>
@@ -37,13 +37,7 @@ export async function SiteHeader({ path }: { path: string }) {
               <label htmlFor="top-q" className="sr-only">Search products and brands</label>
               <input id="top-q" name="q" placeholder="Search pre-rolls, gummies, brands…" autoComplete="off" />
             </form>
-          ) : (
-            <nav className="top-nav hide-sm" aria-label="Main">
-              <Link href="/shop">Shop</Link>
-              <Link href="/guide">How it works</Link>
-              <Link href="/for-stores">For stores</Link>
-            </nav>
-          )}
+          ) : <span className="grow" />}
           <div className="row top-actions" style={{ ["--gap" as string]: "4px", flexWrap: "nowrap" }}>
             {v.user ? (
               <>
@@ -61,7 +55,6 @@ export async function SiteHeader({ path }: { path: string }) {
               <>
                 <Link href={`/sign-in?next=${encodeURIComponent(path)}`} className="top-link">Sign in</Link>
                 <Link href="/sign-up" className="btn primary sm top-join">Create account</Link>
-                {items > 0 && <Link href="/cart" className="cart-btn" aria-label={`Cart, ${items} items`}><IconBag width={18} height={18} aria-hidden /><span className="cart-count num">{items}</span></Link>}
               </>
             )}
           </div>

@@ -23,7 +23,7 @@ export async function SiteFooter() {
         </div>
         <div>
           <p className="strong" style={{ color: "var(--ink)" }}>Explore</p>
-          <ul><li><Link href="/shop">Shop</Link></li><li><Link href="/brands">Brands</Link></li><li><Link href="/how-it-works">How verification works</Link></li><li><Link href="/guide">Cannabis guide</Link></li></ul>
+          <ul>{v.user ? <><li><Link href="/shop">Shop</Link></li><li><Link href="/brands">Brands</Link></li></> : <><li><Link href="/sign-in">Sign in</Link></li><li><Link href="/sign-up">Create account</Link></li></>}<li><Link href="/how-it-works">How verification works</Link></li><li><Link href="/guide">Cannabis guide</Link></li></ul>
         </div>
         <div>
           <p className="strong" style={{ color: "var(--ink)" }}>Work with Cairn</p>

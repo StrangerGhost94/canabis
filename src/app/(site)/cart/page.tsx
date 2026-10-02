@@ -1,3 +1,4 @@
+import { requireUser } from "@/lib/auth/session";
 import Link from "next/link";
 import { chooseFulfilment } from "@/app/actions/cart";
 import { NearControl } from "@/components/discover/near-form";
@@ -14,6 +15,7 @@ import { etaLabel } from "@/lib/routing";
 export const metadata = { title: "Cart" };
 
 export default async function Cart() {
+  await requireUser("/cart");
   const cart = await getCart();
   const session = await getSession();
   if (!cart || cart.lines.length === 0) {

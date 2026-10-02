@@ -9,11 +9,11 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
   const path = (await headers()).get("x-pathname") ?? "/";
   const session = await getSession();
   return (
-    <div className="site">
+    <div className={session ? "site has-nav" : "site"}>
       <SiteHeader path={path} />
       <main id="main">{children}</main>
       <SiteFooter />
-      <BottomNav signedIn={!!session} cartItems={await cartCount()} />
+      {session && <BottomNav signedIn cartItems={await cartCount()} />}
     </div>
   );
 }

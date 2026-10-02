@@ -1,3 +1,4 @@
+import { requireUser } from "@/lib/auth/session";
 import { and, eq, ilike, inArray, ne } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -19,6 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireUser(`/products/${(await params).id}`);
   const { id } = await params;
   const p = await db.query.products.findFirst({ where: and(eq(schema.products.id, id), eq(schema.products.status, "ACTIVE")), with: { inventory: true, retailer: { columns: { jurisdictionCode: true } } } });
   if (!p) notFound();
