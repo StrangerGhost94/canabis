@@ -7,7 +7,7 @@ import { CATEGORIES, CATEGORY_LABEL } from "@/lib/format";
 import { getVisitor } from "@/lib/visitor";
 import { IconBag, IconBell, IconPin, IconReceipt, IconSearch, IconUser } from "./icons";
 import { NavLinks } from "./nav-links";
-import { ChangeRegionButton, RegionGate } from "./region-gate";
+import { RegionGate } from "./region-gate";
 
 export async function SiteHeader({ path }: { path: string }) {
   const v = await getVisitor();
@@ -23,56 +23,56 @@ export async function SiteHeader({ path }: { path: string }) {
 
   const firstName = v.user?.name.split(" ")[0];
 
+  const shopping = path.startsWith("/shop") || path.startsWith("/products") || path.startsWith("/brands");
+
   return (
     <>
       <a className="skip" href="#main">Skip to content</a>
-      <div className="utility">
-        <div className="wrap">
-          <span className="promise"><span>Licensed stores only</span><span>Verify once, order anywhere</span><span>Pay the store at pickup or delivery</span></span>
-          <span className="grow" />
-          {v.policy && <span className="show-sm">{v.user ? <Link href="/account/settings">{v.policy.name} · {v.policy.legalAge}+</Link> : <ChangeRegionButton className="" label={`${v.policy.name} · ${v.policy.legalAge}+`} />}</span>}
-          <Link href="/guide" className="hide-sm">New to cannabis?</Link>
-          <Link href="/for-stores" className="hide-sm">Sell on Cairn</Link>
-          {workspace && <Link href={workspace.href}>{workspace.label}</Link>}
-        </div>
-      </div>
       <header className="topbar">
         <div className="wrap topbar-inner">
           <Link href="/" className="brand" aria-label="Cairn home"><span className="cairn" aria-hidden><i /><i /><i /></span>Cairn</Link>
-          <form action="/shop" role="search" className="top-search hide-sm">
-            <IconSearch aria-hidden />
-            <label htmlFor="top-q" className="sr-only">Search products, brands and stores</label>
-            <input id="top-q" name="q" placeholder="Search flower, pre-rolls, brands, stores…" autoComplete="off" />
-            <button className="btn primary sm">Search</button>
-          </form>
-          {v.policy && (v.user
-            ? <Link href="/account/settings" className="loc-pill hide-sm" title="Change your province"><IconPin width={18} height={18} aria-hidden /><span><small>Shopping in</small><b>{v.near ? v.near.label : v.policy.name}</b></span></Link>
-            : <ChangeRegionButton className="loc-pill hide-sm" label={<><IconPin width={18} height={18} aria-hidden /><span><small>Shopping in · {v.policy.legalAge}+</small><b>{v.near ? v.near.label : v.policy.name}</b></span></>} />)}
+          {v.user ? (
+            <form action="/shop" role="search" className="top-search hide-sm">
+              <IconSearch aria-hidden />
+              <label htmlFor="top-q" className="sr-only">Search products and brands</label>
+              <input id="top-q" name="q" placeholder="Search pre-rolls, gummies, brands…" autoComplete="off" />
+            </form>
+          ) : (
+            <nav className="top-nav hide-sm" aria-label="Main">
+              <Link href="/shop">Shop</Link>
+              <Link href="/guide">How it works</Link>
+              <Link href="/for-stores">For stores</Link>
+            </nav>
+          )}
           <div className="row top-actions" style={{ ["--gap" as string]: "4px", flexWrap: "nowrap" }}>
             {v.user ? (
               <>
+                {v.policy && <Link href="/account/settings#address" className="loc-pill hide-sm" title="Delivery address"><IconPin width={18} height={18} aria-hidden /><span><small>Deliver to</small><b>{v.user.address?.label ?? v.near?.label ?? v.policy.name}</b></span></Link>}
                 <Link href="/orders" className="top-link hide-sm"><IconReceipt width={18} height={18} aria-hidden />Orders</Link>
                 <Link href="/account/notifications" className="top-link hide-sm" aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`}>
                   <IconBell width={18} height={18} />{unread > 0 && <span className="dot" aria-hidden />}
                 </Link>
-                <Link href="/account" className="top-link hide-sm"><IconUser width={18} height={18} aria-hidden />{firstName}</Link>
+                <Link href={workspace?.href ?? "/account"} className="top-link hide-sm"><IconUser width={18} height={18} aria-hidden />{workspace ? workspace.label : firstName}</Link>
+                <Link href="/cart" className="cart-btn" aria-label={`Cart, ${items} ${items === 1 ? "item" : "items"}`}>
+                  <IconBag width={18} height={18} aria-hidden /><span className="lbl">Cart</span>{items > 0 && <span className="cart-count num">{items}</span>}
+                </Link>
               </>
             ) : (
-              <Link href={`/sign-in?next=${encodeURIComponent(path)}`} className="top-link hide-sm"><IconUser width={18} height={18} aria-hidden />Sign in</Link>
+              <>
+                <Link href={`/sign-in?next=${encodeURIComponent(path)}`} className="top-link">Sign in</Link>
+                <Link href="/sign-up" className="btn primary sm top-join">Create account</Link>
+                {items > 0 && <Link href="/cart" className="cart-btn" aria-label={`Cart, ${items} items`}><IconBag width={18} height={18} aria-hidden /><span className="cart-count num">{items}</span></Link>}
+              </>
             )}
-            <Link href="/cart" className="cart-btn" aria-label={`Cart, ${items} ${items === 1 ? "item" : "items"}`}>
-              <IconBag width={18} height={18} aria-hidden /><span className="lbl">Cart</span>{items > 0 && <span className="cart-count num">{items}</span>}
-            </Link>
           </div>
         </div>
-        {cats.length > 0 && (
+        {shopping && cats.length > 0 && (
           <div className="cat-row hide-sm">
             <div className="wrap">
               <NavLinks className="nav cats" links={[
-                { href: "/shop", label: "Shop all" },
+                { href: "/shop", label: "All" },
                 ...cats.map((c) => ({ href: `/shop?category=${c}`, label: CATEGORY_LABEL[c] })),
                 { href: "/brands", label: "Brands" },
-                { href: "/guide", label: "Guide" },
               ]} />
             </div>
           </div>

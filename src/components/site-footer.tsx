@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getVisitor } from "@/lib/visitor";
+import { ChangeRegionButton } from "./region-gate";
 
 export async function SiteFooter() {
   const v = await getVisitor();
@@ -15,7 +16,8 @@ export async function SiteFooter() {
           </p>
           {v.policy && (
             <p>
-              In {v.policy.name}, cannabis retail is licensed by {v.policy.regulator}.
+              In {v.policy.name}, cannabis retail is licensed by {v.policy.regulator}.{" "}
+              {!v.user && <ChangeRegionButton className="linkbtn" label="Change province" />}
             </p>
           )}
         </div>

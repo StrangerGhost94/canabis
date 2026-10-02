@@ -1,3 +1,4 @@
+import { AuthShell } from "@/components/auth/auth-shell";
 import { SignUpForm } from "@/components/auth/sign-up-form";
 import { getJurisdictions } from "@/lib/compliance";
 import { getVisitor } from "@/lib/visitor";
@@ -9,12 +10,9 @@ export default async function SignUp({ searchParams }: { searchParams: Promise<{
   const v = await getVisitor();
   const js = (await getJurisdictions()).map(({ code, name, legalAge }) => ({ code, name, legalAge }));
   return (
-    <div className="wrap section">
-      <div className="stack" style={{ maxWidth: 560 }}>
-        <h1 className="h1">Create an account</h1>
-        <p className="muted">Save stores and products, and get notified when a store you follow changes. Stores and partners start here too.</p>
-        <SignUpForm next={next} jurisdictions={js} region={v.region} intent={as.toUpperCase()} />
-      </div>
-    </div>
+    <AuthShell title="Create your account" sub="Takes a minute. Next, a one-time ID check — then you can order."
+      aside={{ heading: "Verify once. Order anywhere.", points: ["One account for every licensed store in your province", "Your ID is checked once by a person, then the photos are deleted", "Move house? Your orders follow you to the nearest store"] }}>
+      <SignUpForm next={next} jurisdictions={js} region={v.region} intent={as.toUpperCase()} />
+    </AuthShell>
   );
 }

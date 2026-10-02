@@ -28,7 +28,7 @@ export default async function Guide() {
       <section className="night">
         <div className="wrap guide-hero">
           <span className="kicker">The Cairn guide</span>
-          <h1 className="display" style={{ fontSize: "clamp(2.4rem, 5vw, 4.2rem)" }}>Cannabis basics, <em>in plain language.</em></h1>
+          <h1 className="display" style={{ fontSize: "clamp(2.4rem, 5vw, 4.2rem)" }}>Cannabis basics, in plain language.</h1>
           <p className="lede">Everything you need to shop with confidence: what the numbers on a label mean, how the formats differ, and the rules {policy ? `in ${policy.name}` : "where you live"}. Facts only — no hype.</p>
           <nav className="guide-toc" aria-label="On this page">{toc.map(([id, l]) => <a key={id} href={`#${id}`}>{l}</a>)}</nav>
         </div>

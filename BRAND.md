@@ -3,7 +3,10 @@
 ## What it is
 A premium marketplace for **licensed** cannabis stores in Canada. Shoppers browse every licensed shelf in their province, compare the same product across stores, and order from one store at a time. The store is always the seller: it checks ID and takes payment at handover. Cairn never holds product or takes payment.
 
-## Direction: "evening gallery"
+## Direction: "glasshouse" (current)
+Porcelain ground, green-black ink, a deep jade hero band lit with soft lilac and green glows. Display type is Bricolage Grotesque (tight, confident), body is Instrument Sans. Jade (#17704f) is the action colour; lilac (#c8b8ff) is the highlight (checks, verified chips, cart count). No gold. The home page sells one idea — licensed cannabis, delivered — with an app mock-up as the hero image, three steps, categories, and one call to action.
+
+## Earlier direction: "evening gallery"
 Warm ivory ground with a deep evening band (plum-black with brass light) for the hero, guide and calls to action. Rounded, soft-shadowed cards; pill buttons; brass kickers over Bodoni headlines. Every page answers three questions in plain words: what is it, where can I get it, what happens next.
 
 ### Earlier direction: "the gallery"

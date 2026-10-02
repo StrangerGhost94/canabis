@@ -4,7 +4,7 @@
  * imagery, and works for any product a store adds. Stores can upload a real
  * pack shot to replace it.
  */
-const BRAND_INKS = ["#1a1620", "#2f5a46", "#7a3b24", "#33427a", "#5e1f3d", "#245a5a", "#7d6232", "#47404f"];
+const BRAND_INKS = ["#0f1714", "#17704f", "#7a3b24", "#3b4a8f", "#6b4fc4", "#1d5f63", "#8a5a2a", "#3d4a44"];
 
 export function brandInk(brand: string) {
   let h = 0;
@@ -22,7 +22,7 @@ export function PackArt({ p, size = 200 }: { p: { category: string; brand: strin
     <g>
       <rect x={x} y={y} width={w} height={h} rx={4} fill="#fff" />
       <rect x={x} y={y} width={w} height={small ? 4 : 6} fill={ink} />
-      <text x={x + w / 2} y={y + h / 2 + (small ? 4 : 6)} textAnchor="middle" fontSize={small ? 9 : 12} fontWeight={600} fill={ink} fontFamily="var(--font-display)" fontStyle="italic">
+      <text x={x + w / 2} y={y + h / 2 + (small ? 4 : 6)} textAnchor="middle" fontSize={small ? 9 : 12} fontWeight={600} fill={ink} fontFamily="var(--font-display)">
         {p.brand.length > 12 ? p.brand.split(" ")[0] : p.brand}
       </text>
     </g>

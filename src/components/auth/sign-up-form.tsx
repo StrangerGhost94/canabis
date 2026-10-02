@@ -15,9 +15,9 @@ export function SignUpForm({ next, jurisdictions, region, intent }: { next: stri
         <>
           <input type="hidden" name="next" value={next} />
           <fieldset>
-            <legend>I'm here to</legend>
-            <div className="seg">
-              {[["CUSTOMER", "Find stores"], ["RETAILER", "List my store"], ["PARTNER", "Become a partner"]].map(([v, l]) => (
+            <legend className="sr-only">Account type</legend>
+            <div className="seg acct-type">
+              {[["CUSTOMER", "I want to shop"], ["RETAILER", "I run a store"], ["PARTNER", "Partner"]].map(([v, l]) => (
                 <span key={v}><input type="radio" id={`intent-${v}`} name="intent" value={v} defaultChecked={(s?.values?.intent ?? intent) === v} /><label htmlFor={`intent-${v}`}>{l}</label></span>
               ))}
             </div>
